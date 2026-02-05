@@ -1,0 +1,53 @@
+project_id = "idampxfbqakcdamqxgqe"
+
+# Portal do Cliente (auth próprio) - NÃO usa Supabase Auth
+[functions.portal-email-status]
+verify_jwt = false
+
+[functions.portal-register]
+verify_jwt = false
+
+[functions.portal-login]
+verify_jwt = false
+
+[functions.portal-logout]
+verify_jwt = false
+
+[functions.portal-me]
+verify_jwt = false
+
+[functions.portal-password-reset-request]
+verify_jwt = false
+
+[functions.portal-password-reset-confirm]
+verify_jwt = false
+
+[functions.portal-servicos-list]
+verify_jwt = false
+
+[functions.portal-agendamentos-list]
+verify_jwt = false
+
+[functions.portal-profissionais-by-servico]
+verify_jwt = false
+
+[functions.portal-available-slots]
+verify_jwt = false
+
+[functions.portal-agendamento-create]
+verify_jwt = false
+
+[functions.portal-agendamento-get]
+verify_jwt = false
+
+[functions.portal-agendamento-cancel]
+verify_jwt = false
+
+[functions.portal-cliente-upsert]
+verify_jwt = false
+
+[functions.portal-profissional-dias]
+verify_jwt = false
+
+[functions.portal-agendamento-update]
+verify_jwt = false
