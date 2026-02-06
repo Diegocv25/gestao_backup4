@@ -115,12 +115,13 @@
  - Cancelamento de agendamentos futuros
  - Avisos semanais personalizados
  
- ### 9. Configurações do Estabelecimento
- - Upload de logo personalizada (Supabase Storage)
- - Horários de funcionamento por dia da semana
- - Intervalos e fechamentos
- - Avisos semanais para clientes (por dia da semana)
- - Regras de antecedência para agendamentos (horas ou dias)
+### 9. Configurações do Estabelecimento
+- Upload de logo personalizada (Supabase Storage) *(admin)*
+- Horários de funcionamento por dia da semana *(admin)*
+- Intervalos e fechamentos *(admin)*
+- Avisos semanais para clientes (por dia da semana) *(admin)*
+- Regras de antecedência para agendamentos (horas ou dias) *(admin)*
+- **Segurança**: troca de senha do usuário logado *(admin e funcionários não-admin)*
  
  ## 🏢 Arquitetura Multi-Tenant
  
@@ -220,24 +221,24 @@
  - ✅ Gerenciar agendamentos, clientes e serviços
  - ✅ Acesso completo ao dashboard
  
- ### 2. Gerente
- **Acesso Amplo**: Operações do dia-a-dia
- - ✅ Gerenciar agendamentos, clientes, serviços
- - ✅ Gerenciar funcionários (sem criar acessos ao sistema)
- - ✅ Visualizar relatórios completos
- - ✅ Gerenciar produtos e registrar vendas
- - ✅ Configurar avisos e horários
- - ❌ Não pode criar acessos para funcionários
- 
- ### 3. Recepcionista
- **Acesso Operacional**
- - ✅ Gerenciar agendamentos e clientes
- - ✅ Criar novos agendamentos
- - ✅ Visualizar serviços e funcionários
- - ✅ Registrar vendas de produtos
- - ✅ Gerenciar movimentações de estoque
- - ❌ Sem acesso a relatórios financeiros
- - ❌ Sem acesso a configurações
+### 2. Gerente
+**Acesso Amplo**: Operações do dia-a-dia
+- ✅ Gerenciar agendamentos, clientes, serviços
+- ✅ Gerenciar funcionários (sem criar acessos ao sistema)
+- ✅ Visualizar relatórios completos
+- ✅ Gerenciar produtos e registrar vendas
+- ❌ Não pode criar acessos para funcionários
+- ❌ **Configurações do estabelecimento (admin-only)** *(exceto Segurança → troca de senha)*
+
+### 3. Recepcionista
+**Acesso Operacional**
+- ✅ Gerenciar agendamentos e clientes
+- ✅ Criar novos agendamentos
+- ✅ Visualizar serviços e funcionários
+- ✅ Registrar vendas de produtos
+- ✅ Gerenciar movimentações de estoque
+- ❌ Sem acesso a relatórios financeiros
+- ❌ **Configurações do estabelecimento (admin-only)** *(exceto Segurança → troca de senha)*
  
  ### 4. Profissional
  **Acesso Limitado**: Apenas seus próprios dados
@@ -524,13 +525,14 @@
  - ✅ Proteção contra CSRF
  - ✅ Rate limiting do Supabase
  
- ### Autorização
- 
- - ✅ Sistema de roles granular
- - ✅ Validação em múltiplas camadas (frontend + RLS + edge functions)
- - ✅ Guards no frontend (`<RoleGate>`, `<AuthGate>`)
- - ✅ RLS no banco (última linha de defesa)
- - ✅ Edge Functions validam permissões
+### Autorização
+
+- ✅ Sistema de roles granular
+- ✅ Validação em múltiplas camadas (frontend + RLS + edge functions)
+- ✅ Guards no frontend (`<RoleGate>`, `<AuthGate>`, `<BackofficeGate>`)
+- ✅ **Clientes (role `customer`) são bloqueados de acessar rotas do backoffice** (ex: `/configuracoes`, `/agendamentos`, etc.)
+- ✅ RLS no banco (última linha de defesa)
+- ✅ Edge Functions validam permissões
  
  ### Melhores Práticas Implementadas
  
@@ -606,12 +608,13 @@
  ### Estrutura de Pastas
  
  ```
- src/
- ├── auth/              # Autenticação e controle de acesso
- │   ├── AuthGate.tsx
- │   ├── RoleGate.tsx
- │   ├── auth-context.tsx
- │   └── access-context.tsx
+src/
+├── auth/              # Autenticação e controle de acesso
+│   ├── AuthGate.tsx
+│   ├── BackofficeGate.tsx
+│   ├── RoleGate.tsx
+│   ├── auth-context.tsx
+│   └── access-context.tsx
  ├── components/        # Componentes reutilizáveis
  │   ├── ui/           # shadcn/ui components
  │   ├── layout/       # Layout components (sidebar, etc)
