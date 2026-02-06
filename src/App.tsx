@@ -11,6 +11,7 @@ import { AuthGate } from "@/auth/AuthGate";
 import { AccessProvider } from "@/auth/access-context";
 import { RoleGate } from "@/auth/RoleGate";
 import { PortalGate } from "@/auth/PortalGate";
+import { BackofficeGate } from "@/auth/BackofficeGate";
 
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -74,7 +75,8 @@ const App = () => (
               </Route>
 
               <Route element={<AuthGate />}>
-                <Route element={<AppLayout />}>
+                <Route element={<BackofficeGate />}>
+                  <Route element={<AppLayout />}>
                   {/* Profissional */}
                   <Route element={<RoleGate allowed={["profissional"]} />}>
                     <Route path="/profissional/agendamentos" element={<ProfissionalAgendamentosPage />} />
@@ -108,6 +110,7 @@ const App = () => (
                     <Route path="/produtos" element={<ProdutosPage />} />
 
                     <Route path="/relatorios" element={<RelatoriosPage />} />
+                  </Route>
                   </Route>
                 </Route>
               </Route>
