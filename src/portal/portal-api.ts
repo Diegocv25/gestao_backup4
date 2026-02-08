@@ -31,7 +31,10 @@ async function portalPost<T>(path: string, body: unknown): Promise<T> {
     headers: {
       apikey: SUPABASE_PUBLISHABLE_KEY,
       "Content-Type": "application/json",
-      ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
+      // Sempre envie Authorization para satisfazer o gateway do Supabase.
+      // - Com sessão: Bearer <portal_session_token>
+      // - Sem sessão (primeiro acesso/login): Bearer <anon_key>
+      Authorization: `Bearer ${sessionToken ?? SUPABASE_PUBLISHABLE_KEY}`,
     },
     body: JSON.stringify(body ?? {}),
   });
