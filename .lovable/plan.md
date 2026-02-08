@@ -1,113 +1,129 @@
-# Plano de implementação — Portal do Cliente + Isolamento do Backoffice
 
-## Estado atual (com base no código)
-- As Edge Functions do Portal (portal-login, portal-register, portal-me, portal-logout, portal-password-reset-*) já existem e o **RESEND_API_KEY** já está configurado.
-- Porém, o frontend ainda está usando Supabase Auth (supabase.auth.*) + AuthGate para proteger rotas do portal.
-- Não existe ainda no frontend um “PortalGate” que consulte `portal-me` (cookie) e nem telas/rotas próprias do Portal para login/cadastro/reset que chamem as Edge Functions.
-- Além disso, do jeito que as Edge Functions estão hoje, cookies cross-site podem não funcionar de forma confiável (CORS com `Access-Control-Allow-Origin="*"`, sem `Allow-Credentials`, e cookie `SameSite=Lax`). Isso pode impedir o browser de gravar/enviar o cookie `portal_session` para o domínio `*.supabase.co` quando o app roda em `*.lovable.app`.
+Objetivo
+- Aplicar a Opção A: parar de enviar cookies cross-site no portal do cliente, removendo `credentials: "include"` do `fetch` central em `src/portal/portal-api.ts`, mantendo autenticação via `Authorization: Bearer <session_token>` armazenado em `sessionStorage`.
+- Patch mínimo, sem mexer em CORS das edge functions e sem alterar regras multi-tenant.
 
-## ✅ Implementado (Backoffice / Segurança)
-1) **Clientes não acessam o backoffice**
-- Criado `src/auth/BackofficeGate.tsx` e aplicado nas rotas internas do backoffice.
-- Se `role === "customer"`, o usuário é redirecionado para `/auth`.
+Fatos verificados no código (prova)
+1) `src/portal/portal-api.ts`
+- O `fetch` central está em `portalPost()` e hoje usa credenciais:
+  - Trecho (linhas 29–38):
+    ```ts
+    const resp = await fetch(`${BASE}/${path}`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        apikey: SUPABASE_PUBLISHABLE_KEY,
+        "Content-Type": "application/json",
+        ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
+      },
+      body: JSON.stringify(body ?? {}),
+    });
+    ```
+- Ele envia `Authorization: Bearer <token>` quando há token:
+  - `...(sessionToken ? { Authorization: \`Bearer ${sessionToken}\` } : {})`
+- O token vem de `sessionStorage`, chave `portal:session_token`:
+  - `getPortalSessionToken()` → `sessionStorage.getItem(STORAGE_KEY)`
+  - `setPortalSessionToken()` → `sessionStorage.setItem(STORAGE_KEY, token)`
 
-2) **Configurações restritas para funcionários não-admin**
-- Em `src/pages/Configuracoes.tsx`, qualquer role diferente de `admin` (exceto `null` em onboarding) visualiza **apenas o card “Segurança”** (troca de senha).
-- Demais cards (Dados do estabelecimento / Horários / Avisos semanais) ficam ocultos.
+2) Endpoints usados no primeiro acesso e login
+- Primeiro acesso (tela “Crie sua senha”):
+  - `src/pages/ClientePortalPrimeiroAcesso.tsx` chama:
+    - `portalRegister({ token, email, password, confirmPassword })`
+  - Em `src/portal/portal-api.ts`, isso vai para:
+    - `POST /functions/v1/portal-register`
+- Login (tela “Entrar”):
+  - `src/pages/ClientePortalEntrar.tsx` chama:
+    - `portalLogin({ token, email, password })`
+    - e, se vier `session_token`, salva em sessionStorage:
+      ```ts
+      if (resp.session_token) setPortalSessionToken(resp.session_token);
+      ```
+  - Em `src/portal/portal-api.ts`, isso vai para:
+    - `POST /functions/v1/portal-login`
+- Checagem de sessão (gate do portal):
+  - `src/auth/PortalGate.tsx` chama:
+    - `portalMe(token)`
+  - Em `src/portal/portal-api.ts`, isso vai para:
+    - `POST /functions/v1/portal-me`
+  - Importante: `portalMe()` sempre usa `portalPost()`, portanto (após o patch) continuará mandando Bearer quando houver token no sessionStorage.
 
-3) **Remoção do card “Acesso (RBAC)”**
-- O card de gestão de acesso (criar admins pela interface) foi removido para evitar replicação de administradores.
+Patch mínimo proposto (somente 1 ponto)
+- Arquivo: `src/portal/portal-api.ts`
+- Alteração: remover a linha `credentials: "include",` do `fetch` em `portalPost()`.
 
-## Conclusão direta
-- O isolamento do backoffice está ajustado (clientes bloqueados; funcionários não-admin com acesso apenas à troca de senha em Configurações).
-- **Ainda não está 100% pronto para teste do portal com login próprio** (sem Supabase Auth), pois falta integração do frontend + ajustes de CORS/cookies (ou fallback por token via header).
+Diff (patch mínimo)
+```diff
+diff --git a/src/portal/portal-api.ts b/src/portal/portal-api.ts
+index 0000000..0000000 100644
+--- a/src/portal/portal-api.ts
++++ b/src/portal/portal-api.ts
+@@ -27,12 +27,11 @@ async function portalPost<T>(path: string, body: unknown): Promise<T> {
+   const sessionToken = getPortalSessionToken();
 
-## O que falta implementar (sequência recomendada)
+   const resp = await fetch(`${BASE}/${path}`, {
+     method: "POST",
+-    credentials: "include",
+     headers: {
+       apikey: SUPABASE_PUBLISHABLE_KEY,
+       "Content-Type": "application/json",
+       ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
+     },
+     body: JSON.stringify(body ?? {}),
+   });
+```
 
-### 1) Decidir/ajustar a estratégia de sessão (para ficar testável no navegador)
+O que muda (comportamento)
+- Antes: o browser tentava mandar/receber cookies (modo `credentials: include`) nas chamadas às edge functions. Se alguma resposta viesse com `Access-Control-Allow-Origin: *`, o browser bloqueava por CORS (preflight `OPTIONS` falha), resultando em “Failed to fetch”.
+- Depois: as chamadas deixam de ser “credentialed requests” (sem cookies). Isso elimina o bloqueio específico “wildcard + include”.
+- A autenticação do portal continua funcionando via:
+  - `session_token` retornado no JSON por `portal-login` e `portal-register`
+  - armazenado em `sessionStorage`
+  - reenviado como `Authorization: Bearer <session_token>` pelo `portalPost()`.
 
-**Opção A — manter cookie httpOnly (preferida se funcionar no seu público-alvo)**
-- Ajustar CORS nas funções do portal para:
-  - `Access-Control-Allow-Origin`: usar o domínio exato do app (preview e publicado), não `"*"`
-  - `Access-Control-Allow-Credentials: "true"`
-  - `Access-Control-Allow-Headers` incluindo os headers usados (`apikey`, `content-type`, etc.)
-- Ajustar `Set-Cookie` nas funções:
-  - `SameSite=None` (para permitir cookie em requisições cross-site via fetch)
-  - `Secure` mantido
-- No frontend, todas as chamadas para as functions devem usar `credentials: "include"`.
+Checklist de testes E2E (passo a passo)
+Pré-condição recomendada
+- Em uma aba anônima (para evitar cookies/storage antigos), abrir DevTools → Network (preservar logs).
 
-**Opção B — fallback robusto (recomendado se Safari/iOS bloquear cookie third-party)**
-- Alterar as functions para também aceitarem um token via header (ex: `Authorization: Bearer <token>` ou `x-portal-session`).
-- No login/register, retornar o token no body e o frontend guarda em memória/sessionStorage e manda no header.
-- `portal-me` valida via header ao invés de cookie.
+1) Primeiro acesso (registro)
+- Abrir: `/cliente/<token>/primeiro-acesso`
+- Preencher email + senha + confirmar
+- Esperado:
+  - Network: `POST .../functions/v1/portal-register` retorna HTTP 200 (ou 4xx com JSON de erro, mas não “(blocked)/(canceled)”)
+  - Sem erro de CORS no Console
+  - App redireciona para `/cliente/<token>/entrar` (como já faz hoje)
 
-**Por que isso é crítico**
-- Sem esses ajustes, o “login parece funcionar” mas o `portal-me` retorna `authenticated:false`, porque o cookie não grava ou não volta.
+2) Login
+- Abrir: `/cliente/<token>/entrar`
+- Logar com email/senha
+- Esperado:
+  - Network: `POST .../functions/v1/portal-login` retorna HTTP 200 (ou 4xx com JSON de erro controlado)
+  - `session_token` vem no JSON e é salvo em `sessionStorage` (Application → Session Storage → chave `portal:session_token`)
+  - Navega para `/cliente/<token>/app`
 
-### 2) Criar um “PortalAuth API client” no frontend
-- Criar helpers do tipo:
-  - `portalLogin(token, email, password)`
-  - `portalRegister(token, email, password, confirmPassword)`
-  - `portalMe(token)`
-  - `portalLogout()`
-  - `portalPasswordResetRequest(token, email)`
-  - `portalPasswordResetConfirm(token, code, password, confirmPassword)`
-- Implementar via `fetch` para `https://<project>.supabase.co/functions/v1/<function>`
-- Incluir headers: `apikey` (anon/public key), `content-type` e `credentials` (se usar cookie).
+3) Sessão / Gate
+- Ao entrar em `/app`, o `PortalGate` chama `portal-me`
+- Esperado:
+  - Network: `POST .../functions/v1/portal-me` retorna `ok: true, authenticated: true`
+  - Request headers incluem `Authorization: Bearer <token>` (verificar em Network → Headers)
 
-### 3) Implementar `PortalGate` (proteção das rotas do Portal do Cliente)
-- Substituir o uso de `<AuthGate />` nas rotas `/cliente/:token/*` por um `<PortalGate />` específico.
-- `PortalGate` deve:
-  - Ler token da URL
-  - Chamar `portal-me(token)`
-  - Se `authenticated:true` → renderiza `<Outlet />`
-  - Se `authenticated:false` → redireciona para `/cliente/:token/entrar`
-  - Se token inválido → mostrar “link inválido”
+4) Cadastro de cliente (se aplicável)
+- Se redirecionar para `/cadastro`, completar
+- Esperado:
+  - Chamada para `portal-cliente-upsert` (via `portalPost`) com Bearer funcionando
+  - Sem “Failed to fetch”
 
-### 4) Criar as páginas/rotas do Portal para login/cadastro/reset
-Rotas sugeridas:
-- `/cliente/:token` (landing)
-- `/cliente/:token/entrar` (login)
-- `/cliente/:token/primeiro-acesso` (cadastro)
-- `/cliente/:token/esqueci` (solicitar reset)
-- `/cliente/:token/resetar-senha?code=...` (confirmar nova senha)
+5) Agendamentos (sanity check)
+- Listar serviços / horários / criar e cancelar agendamento
+- Esperado:
+  - Endpoints `portal-servicos-list`, `portal-available-slots`, `portal-agendamento-create`, etc. funcionando com Bearer e sem bloqueio CORS.
 
-Comportamento:
-- Entrar: chama `portal-login` e, se ok, navega para `/cliente/:token/app`
-- Primeiro acesso: chama `portal-register` e navega para `/cliente/:token/app`
-- Esqueci: chama `portal-password-reset-request` e sempre mostra mensagem genérica (anti-enumeração)
-- Resetar: chama `portal-password-reset-confirm` e manda para `/cliente/:token/entrar`
+Observações / Riscos (mantidos ao mínimo)
+- Este patch não altera multi-tenant nem lógica de sessão no backend; apenas remove o envio de cookies do browser.
+- Se alguma edge function depender exclusivamente de cookie `portal_session` (e não aceitar Bearer), ela passaria a falhar. Porém, pelo código que já vimos no `portal-me` (e pelo padrão do projeto), as functions suportam Bearer via `Authorization`/`x-portal-session`.
 
-### 5) Ajustar o fluxo atual `/cliente/:token`
-- Hoje ele manda para `/auth` (Supabase Auth). Isso deve mudar para mandar para `/cliente/:token/entrar`.
-- Remover dependência do `supabase.auth` dentro do portal (inclusive o “Logout” atual no portal).
-
-### 6) Roteamento final no `App.tsx`
-- Rotas públicas do portal:
-  - `/cliente/:token`
-  - `/cliente/:token/entrar`
-  - `/cliente/:token/primeiro-acesso`
-  - `/cliente/:token/esqueci`
-  - `/cliente/:token/resetar-senha`
-- Rotas protegidas do portal:
-  - `/cliente/:token/app`
-  - `/cliente/:token/servicos`
-  - `/cliente/:token/novo`
-  - `/cliente/:token/agendamentos...`
-  - protegidas por `<PortalGate />`
-
-## Plano de teste ponta-a-ponta (quando terminar)
-1. Abrir `/cliente/<TOKEN_SALAO_A>` em aba anônima
-2. “Primeiro acesso” → cadastrar email + senha → deve entrar no `/app`
-3. Abrir `/cliente/<TOKEN_SALAO_B>` no mesmo navegador
-   - Deve invalidar/sair do contexto anterior (regra de ouro) e exigir novo login/cadastro do salão B
-4. “Esqueci minha senha” no salão A
-   - Checar chegada do email e o link `/cliente/<TOKEN>/resetar-senha?code=...`
-5. Confirmar nova senha → login → verificar que sessões anteriores foram revogadas
-
-## Riscos/observações
-- Se você quiser máxima compatibilidade (Safari/iOS), o modelo “cookie third-party” pode ser instável; se isso acontecer, implementamos o fallback por header/token (Opção B).
-- O backoffice continua usando Supabase Auth normalmente; o Portal do Cliente fica totalmente isolado.
-
-## Próxima decisão necessária
-- Você prefere tentar manter cookie httpOnly (Opção A) primeiro, ou já implementar direto o fallback por token em header (Opção B) para garantir compatibilidade em qualquer navegador?
+Arquivos impactados (para revisão rápida)
+- Alterar: `src/portal/portal-api.ts` (1 linha removida)
+- Garantir que permanece como está (sem alterações):
+  - `src/pages/ClientePortalEntrar.tsx` (salva `session_token` em sessionStorage)
+  - `src/pages/ClientePortalPrimeiroAcesso.tsx` (não faz auto-login; limpa token e volta ao login)
+  - `src/auth/PortalGate.tsx` (continua chamando `portal-me`)
