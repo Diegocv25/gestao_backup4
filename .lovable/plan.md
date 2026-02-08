@@ -1,270 +1,176 @@
 
-## Evidências coletadas (somente leitura)
+## Concordo/Discordo (com base no código)
 
-### 1) Onde exatamente `portal-login` e `portal-register` retornam **401** (no código)
+- Concordo com o diagnóstico central: **o 401 observado no Network do `portal-me` não nasce do código da function**, porque `portal-me/index.ts` só retorna `400/500` e `200` com `authenticated: true/false`. Então é **rejeição do gateway** antes de executar a Edge Function.
+- Concordo com a hipótese do gateway: **o Supabase gateway espera um Bearer “Supabase-style”** (anon JWT / user JWT). Quando você manda `Authorization: Bearer <portal_session_token>` (token custom), ele rejeita com **401**.
+- **Discordo parcialmente** do plano “frontend-only” como foi escrito: hoje, **todas as Edge Functions do portal têm um helper `getBearer()` que prioriza `Authorization: Bearer ...` e só usa `x-portal-session` como fallback**.  
+  Ou seja: se o frontend mandar `Authorization: Bearer <anon>` sempre, **o backend vai ler `<anon>` como sessionToken** e **vai ignorar o `x-portal-session`** (porque retorna no primeiro `if`). Isso faria o portal “parecer deslogado” (ou sem sessão) mesmo sem 401.
 
-#### `supabase/functions/portal-login/index.ts`
-Há **dois** guards explícitos que retornam `401`:
-
-1) Conta não encontrada para (salao_id + email_normalized)
-```ts
-if (!acc) return json(req, { ok: false, error: "cadastro necessário" }, { status: 401 });
-```
-Razão: não existe `portal_accounts` para aquele salão + email.
-
-2) Senha inválida
-```ts
-if (!okPass) return json(req, { ok: false, error: "senha inválida" }, { status: 401 });
-```
-Razão: `verifyPassword()` falhou.
-
-Observação: os demais erros desse arquivo retornam 400 (inputs/link inválido) ou 500 (exceptions).
-
-#### `supabase/functions/portal-register/index.ts`
-**Não existe nenhum `return ... { status: 401 }`** nesse arquivo.
-
-Os retornos são:
-- 400 (token/email/senha inválidos; senhas não conferem; link inválido)
-- 409 (`conta já existe`)
-- 500 (exception)
-
-Trechos exemplo:
-```ts
-if (existing) return json(req, { ok: false, error: "conta já existe" }, { status: 409 });
-...
-return json(req, { ok: true });
-```
-
-✅ Conclusão baseada em evidência: se você está vendo **HTTP 401** em `portal-register`, esse 401 **não nasce do código do arquivo** que está versionado aqui — ele vem de fora da lógica (gateway/config do Supabase) **ou** o deploy que está rodando no Supabase **não corresponde** a este código.
+➡️ Portanto, para a estratégia “Authorization fixo com anon + sessão em x-portal-session” funcionar, precisa de **um patch mínimo também nas Edge Functions** (não é “robustez inútil”; é essencial para que `x-portal-session` passe a ter prioridade).
 
 ---
 
-### 2) O que o frontend envia nessas chamadas (body + headers), por evidência do código
+## 1) Somente leitura/diagnóstico (evidências já confirmadas no código)
 
-#### Cliente HTTP central: `src/portal/portal-api.ts`
-O `fetch` central é `portalPost()`:
+### 1.1 Frontend: onde decide o Authorization e como chama `portal-me`
+**Arquivo:** `src/portal/portal-api.ts`  
+Hoje (após seu último diff), `portalPost()` monta:
+- `apikey: SUPABASE_PUBLISHABLE_KEY` (sempre)
+- `Authorization: Bearer ${sessionToken ?? SUPABASE_PUBLISHABLE_KEY}` (sempre)
 
-Headers **sempre enviados**:
+Isso explica o runtime:
+- Após login, existe sessionToken ⇒ **Authorization vira Bearer <session_token custom>** ⇒ gateway rejeita ⇒ **401** antes da function rodar.
+
+**Arquivo:** `src/auth/PortalGate.tsx`  
+`portal-me` é chamado assim:
 ```ts
-headers: {
-  apikey: SUPABASE_PUBLISHABLE_KEY,
-  "Content-Type": "application/json",
-  ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
-},
+queryFn: async () => portalMe(tokenValue)
 ```
+e `portalMe()` faz `portalPost("portal-me", { token })`.
 
-Body:
+### 1.2 Backend: por que `x-portal-session` hoje não resolve sozinho
+**Arquivo:** `supabase/functions/portal-me/index.ts`  
+Helper atual:
 ```ts
-body: JSON.stringify(body ?? {}),
+function getBearer(req: Request) {
+  const auth = req.headers.get("authorization") ?? "";
+  if (auth.toLowerCase().startsWith("bearer ")) return auth.slice(7).trim();
+  const x = req.headers.get("x-portal-session") ?? "";
+  return x.trim() || null;
+}
 ```
 
-Token do portal:
-- Lido do `sessionStorage`:
-```ts
-const STORAGE_KEY = "portal:session_token";
-sessionStorage.getItem(STORAGE_KEY);
-```
-- Salvo/removido no `sessionStorage`:
-```ts
-sessionStorage.setItem(STORAGE_KEY, token);
-sessionStorage.removeItem(STORAGE_KEY);
-```
+➡️ Se o frontend mandar `Authorization: Bearer <anon>`, `getBearer()` vai retornar `<anon>` e **não vai ler `x-portal-session`**.
 
-✅ Importante: quando **não existe** `session_token` ainda (primeiro acesso / login inicial), **NÃO** é enviado header `Authorization`. Apenas `apikey` + `Content-Type`.
-
-#### Tela de login: `src/pages/ClientePortalEntrar.tsx`
-Chama:
-```ts
-portalLogin({ token: tokenValue, email, password });
-```
-
-E salva token se vier:
-```ts
-if (resp.session_token) setPortalSessionToken(resp.session_token);
-```
-
-Body enviado para a function (via `portalPost`):
-```json
-{ "token": "<tokenValue>", "email": "<email>", "password": "<password>" }
-```
-
-Headers (sem token ainda):
-- `apikey: <SUPABASE_PUBLISHABLE_KEY>`
-- `Content-Type: application/json`
-- sem `Authorization`
-
-#### Tela primeiro acesso: `src/pages/ClientePortalPrimeiroAcesso.tsx`
-Chama:
-```ts
-portalRegister({ token: tokenValue, email, password, confirmPassword });
-```
-
-Body enviado:
-```json
-{ "token": "<tokenValue>", "email": "<email>", "password": "<password>", "confirmPassword": "<confirmPassword>" }
-```
-
-Headers (sem token ainda):
-- `apikey: <SUPABASE_PUBLISHABLE_KEY>`
-- `Content-Type: application/json`
-- sem `Authorization`
+O mesmo padrão aparece em `portal-login`, `portal-register`, `portal-cliente-upsert`, `portal-agendamentos-list`, etc. (duplicado em vários arquivos).
 
 ---
 
-### 3) Variáveis/secrets exigidos pelas functions e o que acontece se faltarem
+## 2) Solução mínima e eficaz (separar Auth do Gateway vs Sessão do Portal)
 
-#### `portal-login` / `portal-register` / `portal-me` / `portal-cliente-upsert`
-Todas usam `getServiceClient()`:
+### Objetivo
+- **Gateway:** sempre satisfeito com `apikey` + `Authorization: Bearer <anon>`.
+- **Sessão do portal:** enviada em header separado `x-portal-session: <portal_session_token>` quando existir.
+- **Backend:** deve **priorizar** `x-portal-session` sobre `Authorization` para autenticação do portal.
 
-```ts
-const url = Deno.env.get("SUPABASE_URL");
-const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-if (!url || !serviceKey) throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
-```
-
-Se faltarem:
-- cai no `catch` e responde **500** (não 401), por exemplo em `portal-register`:
-```ts
-return json(req, { ok: false, error: String(e?.message ?? e) }, { status: 500 });
-```
-
-✅ Logo: o 401 atual **não é** por ausência de `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_URL` (isso daria 500, por evidência).
-
-Outros secrets citados (RESEND_API_KEY etc.) não aparecem nesses arquivos e não são necessários para login/register/me/upsert conforme o código lido.
+Isso mantém 100% das regras de produto (Opções 1/2/3) no backend; só evita bloqueio do gateway.
 
 ---
 
-### 4) Arquivos relevantes do Portal do Cliente + fluxo (por evidência do repo)
+## 3) Patch mínimo proposto (com diffs exatos) — NÃO aplicar ainda
 
-#### Frontend (Portal)
-- `src/portal/portal-api.ts` (HTTP client central; sessionStorage; chamadas às functions)
-- `src/pages/ClientePortalEntrar.tsx` (login)
-- `src/pages/ClientePortalPrimeiroAcesso.tsx` (criar senha; register)
-- `src/auth/PortalGate.tsx` (gate pós-login; chama `portal-me`) **(a revisar no próximo passo se necessário, mas o endpoint está em `portal-api.ts`)**
-- `src/pages/ClientePortalCadastro.tsx` (provável vínculo/registro do cliente no salão) **(não lido ainda nesta rodada, mas faz parte do fluxo)**
-- `src/pages/ClientePortalApp.tsx` (shell do portal autenticado)
-- Páginas de agendamento:
-  - `src/pages/ClientePortalNovoAgendamento.tsx`
-  - `src/pages/ClientePortalMeusAgendamentos.tsx`
-  - `src/pages/ClientePortalAgendamentoForm.tsx`
-  - `src/pages/ClientePortalResetarSenha.tsx`, `ClientePortalEsqueciSenha.tsx` (recuperação)
+### 3.1 Frontend (1 ponto): `src/portal/portal-api.ts`
+**Motivo:** impedir gateway 401 ao nunca mais mandar Bearer custom no `Authorization`.
 
-#### Edge Functions (Portal)
-- `supabase/functions/portal-register/index.ts`
-- `supabase/functions/portal-login/index.ts`
+**Diff (exato, conceitual):**
+```diff
+ async function portalPost<T>(path: string, body: unknown): Promise<T> {
+   const sessionToken = getPortalSessionToken();
+
+   const resp = await fetch(`${BASE}/${path}`, {
+     method: "POST",
+     headers: {
+       apikey: SUPABASE_PUBLISHABLE_KEY,
+       "Content-Type": "application/json",
+-      // Sempre envie Authorization para satisfazer o gateway do Supabase.
+-      // - Com sessão: Bearer <portal_session_token>
+-      // - Sem sessão (primeiro acesso/login): Bearer <anon_key>
+-      Authorization: `Bearer ${sessionToken ?? SUPABASE_PUBLISHABLE_KEY}`,
++      // Gateway do Supabase: sempre use Bearer anon (JWT do Supabase).
++      Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
++      // Sessão custom do Portal: vai em header separado (quando existir).
++      ...(sessionToken ? { "x-portal-session": sessionToken } : {}),
+     },
+     body: JSON.stringify(body ?? {}),
+   });
+```
+
+**Por que isso resolve o 401 observado (evidência runtime):**
+- Hoje, seu runtime prova: “`apikey` presente e `Authorization` ausente → 401 no gateway”; vocês corrigiram para enviar `Authorization`.
+- Agora o problema mudou: “`Authorization: Bearer <session_token custom>` → 401 no gateway”.  
+  Este diff elimina isso porque **o `Authorization` volta a ser sempre o anon JWT**, que o gateway aceita.
+
+### 3.2 Backend (mínimo necessário): priorizar `x-portal-session` no `getBearer()`
+**Motivo:** com o frontend acima, o backend precisa pegar a sessão pelo header `x-portal-session` (porque `Authorization` será sempre anon).
+
+**Patch mínimo (em cada Edge Function do portal que usa sessão):**
+
+#### Exemplo diff exato em `supabase/functions/portal-me/index.ts`
+```diff
+ function getBearer(req: Request) {
+-  const auth = req.headers.get("authorization") ?? "";
+-  if (auth.toLowerCase().startsWith("bearer ")) return auth.slice(7).trim();
+   const x = req.headers.get("x-portal-session") ?? "";
+-  return x.trim() || null;
++  const xToken = x.trim();
++  if (xToken) return xToken;
++
++  const auth = req.headers.get("authorization") ?? "";
++  if (auth.toLowerCase().startsWith("bearer ")) return auth.slice(7).trim();
++  return null;
+ }
+```
+
+**Por que isso não mexe em produto/multi-tenant:**
+- Só muda **a forma de leitura do token** (prioridade do header).
+- Toda a lógica de vínculo, isolamento por `salao_id` (“REGRA DE OURO”), expiração, revogação e cadastro continua igual.
+
+#### Onde aplicar esse patch (lista objetiva)
+Para não corrigir só o `portal-me` e quebrar o resto após login, aplicar o mesmo diff em todas as functions do portal que usam `getBearer()` para sessão:
+
 - `supabase/functions/portal-me/index.ts`
+- `supabase/functions/portal-logout/index.ts` (se tiver sessão)
 - `supabase/functions/portal-cliente-upsert/index.ts`
-- Agendamentos:
-  - `portal-servicos-list`
-  - `portal-profissionais-by-servico`
-  - `portal-profissional-dias`
-  - `portal-available-slots`
-  - `portal-agendamento-create`
-  - `portal-agendamento-get`
-  - `portal-agendamento-update`
-  - `portal-agendamento-cancel`
-  - `portal-agendamentos-list`
-- Config:
-  - `supabase/config.toml` (todas as functions do portal com `verify_jwt = false`)
+- `supabase/functions/portal-servicos-list/index.ts`
+- `supabase/functions/portal-agendamentos-list/index.ts`
+- `supabase/functions/portal-profissionais-by-servico/index.ts`
+- `supabase/functions/portal-profissional-dias/index.ts`
+- `supabase/functions/portal-available-slots/index.ts`
+- `supabase/functions/portal-agendamento-create/index.ts`
+- `supabase/functions/portal-agendamento-get/index.ts`
+- `supabase/functions/portal-agendamento-update/index.ts`
+- `supabase/functions/portal-agendamento-cancel/index.ts`
 
-#### Fluxo (alto nível, conforme o código)
-1) Primeiro acesso (criar senha)
-- Página `ClientePortalPrimeiroAcesso.tsx` → `portalRegister(...)` → function `portal-register`
-- A function cria `portal_accounts` e **não** autentica automaticamente: `return { ok: true }`
-
-2) Login
-- Página `ClientePortalEntrar.tsx` → `portalLogin(...)` → function `portal-login`
-- A function valida password, cria sessão em `portal_sessions` e retorna:
-  ```ts
-  return json(req, { ok: true, session_token: sessionToken }, { headers: { "Set-Cookie": ... } });
-  ```
-- Frontend salva `session_token` no `sessionStorage`
-
-3) Gate / sessão
-- `PortalGate` → chama `portalMe(token)` → function `portal-me`
-- `portal-me` lê token via header `Authorization: Bearer <portal_session_token>` (ou cookie `portal_session`) e valida em `portal_sessions`
-- Se ok, retorna `authenticated: true` + `cliente` (ou null)
-
-4) Vínculo / cadastro no salão
-- Frontend chama `portal-cliente-upsert` (exige sessão válida):
-  - `portal-cliente-upsert` tem guard de sessão:
-    ```ts
-    if (!sessionToken) return { ok: false, status: 401, error: "unauthorized" };
-    ```
-
-5) Agendamentos
-- Chamadas seguintes usam o mesmo esquema: body com `{ token: <token do salão> ... }` e autenticação via sessão (Bearer/cookie).
+Observação: `portal-login` e `portal-register` também têm `getBearer()` (para revogar cookie anterior / etc.). É seguro aplicar também para consistência, mas **não é estritamente necessário** para resolver o 401 do `portal-me`. Eu incluiria por padronização e para evitar surpresas.
 
 ---
 
-## Diagnóstico final (baseado em evidências do código + sintomas)
+## 4) Sequência de validação (E2E) após implementar
 
-Você está vendo **401 no portal-register e portal-login** depois de remover `credentials: include`.
+### 4.1 Validar gateway (Network)
+Para `portal-register`, `portal-login`, `portal-me`:
+- Request deve ter:
+  - `apikey: <anon>`
+  - `Authorization: Bearer <anon>` (constante)
+  - `x-portal-session: <session_token>` **somente depois do login**
+- Resposta esperada:
+  - `portal-register`: 200/400/409 (não 401)
+  - `portal-login`: 200 ou 401 **do código** (“cadastro necessário/senha inválida”), não do gateway
+  - `portal-me`: 200 com `{ ok:true, authenticated:true|false }` (não 401)
 
-Pelo código do repo:
-- `portal-login` pode retornar 401 por “cadastro necessário” ou “senha inválida”.
-- `portal-register` **não retorna 401** em hipótese nenhuma.
-
-Então, para ambos darem 401 “no gateway” (antes da lógica), o cenário mais compatível com os fatos é:
-
-### Causa raiz mais provável (e mínima) para 401 em ambos
-**O gateway do Supabase está rejeitando as chamadas por “autorização mínima insuficiente”** (apikey/Authorization anon), antes da função rodar.
-
-Mesmo enviando `apikey`, na prática o gateway costuma aceitar também (ou exigir, dependendo do ambiente/proxy/config) `Authorization: Bearer <anon_key>` em requests sem sessão.
-
-No seu frontend hoje:
-- quando não existe `portal:session_token`, ele manda `apikey`, mas **não manda `Authorization`**.
-
-Isso combina com sua suspeita e explica:
-- 401 em login/register (primeiras chamadas “sem sessão”)
-- e o fato de `portal-register` não ter 401 no código (logo 401 vem de fora)
-
-Também é compatível com o histórico de “respostas com CORS `*`”: isso sugere divergência de deploy/config no Supabase em relação ao código do repo, reforçando que o gateway pode estar aplicando regras diferentes.
-
----
-
-## Ajuste mínimo necessário para parar o 401 (ainda sem executar)
-
-### Mudança mínima (1 ponto, no frontend)
-Em `src/portal/portal-api.ts`, no `portalPost()`:
-
-- Quando **não houver** `sessionToken` no sessionStorage, enviar também:
-  - `Authorization: Bearer <SUPABASE_PUBLISHABLE_KEY>` (anon key)
-
-- Quando houver `sessionToken`, manter:
-  - `Authorization: Bearer <sessionToken>` (como já é hoje)
-
-Em pseudo-diff (descrição):
-- Hoje:
-  - `Authorization` só existe se `sessionToken` existe
-- Proposto:
-  - `Authorization` sempre existe:
-    - se `sessionToken` existe → `Bearer <sessionToken>`
-    - senão → `Bearer <anonKey>`
-
-Isso é o menor ajuste que:
-- não mexe em CORS das functions
-- não mexe em multi-tenant
-- mantém o fluxo de produto (Opções 1/2/3) intacto
-- atende o requisito do gateway, se ele estiver exigindo `Authorization` além de `apikey`.
-
-### Observação importante (por causa do backend atual)
-As functions do portal reutilizam `Authorization: Bearer ...` como “portal session token” quando existe. Para login/register sem sessão, mandar Bearer anon key pode fazer a function “achar” que existe um “prevToken” e tentar revogar (em `portal-login`), mas isso é best-effort e não deve quebrar; ainda assim, é bom registrar isso como efeito colateral esperado (revoga hash que não existe).
+### 4.2 Se ainda houver 401 (plano de contingência com evidência)
+Se `portal-me` continuar 401 mesmo com `Authorization: Bearer <anon>`:
+- evidência passa a apontar para:
+  1) **anon key errada/rotacionada** (publishable key desatualizada), ou
+  2) **projeto Supabase diferente** do que o preview está chamando, ou
+  3) alguma policy/gateway config fora do repo.
+- Ação: comparar o **response body** do 401:
+  - 401 do gateway tende a ser payload “genérico Unauthorized”
+  - 401 do seu código (em `portal-login`) tende a vir com `{ ok:false, error:"..." }` e CORS headers custom.
+- Aí o próximo passo seria alinhar a key/URL com o projeto correto (sem mexer em lógica).
 
 ---
 
-## Plano de implementação (quando você autorizar voltar a editar)
-1) Ajustar `src/portal/portal-api.ts` para sempre enviar `Authorization`:
-   - `Bearer sessionToken` quando existir
-   - `Bearer SUPABASE_PUBLISHABLE_KEY` quando não existir
+## 5) Observações operacionais (Lovable ↔ Supabase)
+- Frontend: alteração no Lovable resolve imediatamente no preview.
+- Edge Functions: eu altero os arquivos no Lovable para versionar; **o Diego copia/cola manualmente a mesma mudança no Supabase** (porque runtime real está lá).
 
-2) Re-testar E2E:
-   - `/cliente/<token>/primeiro-acesso` → `portal-register` deve responder 200/400/409 (não 401)
-   - `/cliente/<token>/entrar` → `portal-login` deve responder 200 ou 401 “cadastro necessário/senha inválida” (agora sim vindo da função, não do gateway)
-   - após login: `portal-me` deve autenticar com Bearer sessionToken
-   - `portal-cliente-upsert` deve funcionar com 200/409/400, e 401 apenas se sessão ausente/expirada
+---
 
-3) Se (e só se) ainda houver 401 em `portal-register` mesmo com `Authorization: Bearer <anon>`:
-   - Aí a evidência passa a apontar fortemente para divergência de deploy no Supabase (function diferente) ou apikey inválida/rotacionada.
-   - Próximo passo objetivo seria comparar a Response body/headers do 401 (gateway geralmente retorna JSON padrão de “Unauthorized” sem o payload `{ ok: false, error: ... }` da sua função). Isso diferencia “gateway 401” vs “401 do código”.
+## Confirmação sobre “patch inútil”
+Você está certo em evitar patch “aceitar Authorization cru” (não resolve gateway).  
+Mas aqui o patch no backend **não é robustez aleatória**: ele é o ajuste mínimo indispensável para que a estratégia `x-portal-session` funcione, já que hoje o código dá prioridade ao `Authorization`.
 
+Se aprovar, eu implemento:
+1) `src/portal/portal-api.ts` (Authorization sempre anon + x-portal-session)
+2) Atualização consistente de `getBearer()` em todas as portal functions listadas
