@@ -28,7 +28,6 @@ async function portalPost<T>(path: string, body: unknown): Promise<T> {
 
   const resp = await fetch(`${BASE}/${path}`, {
     method: "POST",
-    credentials: "include",
     headers: {
       apikey: SUPABASE_PUBLISHABLE_KEY,
       "Content-Type": "application/json",
