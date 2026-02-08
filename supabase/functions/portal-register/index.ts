@@ -117,10 +117,13 @@ function setSessionCookie(token: string, maxAgeSeconds: number) {
 }
 
 function getBearer(req: Request) {
+  const x = req.headers.get("x-portal-session") ?? "";
+  const xToken = x.trim();
+  if (xToken) return xToken;
+
   const auth = req.headers.get("authorization") ?? "";
   if (auth.toLowerCase().startsWith("bearer ")) return auth.slice(7).trim();
-  const x = req.headers.get("x-portal-session") ?? "";
-  return x.trim() || null;
+  return null;
 }
 
 serve(async (req) => {
