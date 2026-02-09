@@ -2,19 +2,21 @@
  
  Sistema SaaS completo de gestão para estabelecimentos de serviços (salões de beleza, barbearias, clínicas, spas, etc.) com arquitetura multi-tenant, controle de acesso baseado em roles e portal do cliente.
  
- ## 📋 Índice
- 
- - [Visão Geral](#visão-geral)
- - [Funcionalidades](#funcionalidades)
- - [Arquitetura Multi-Tenant](#arquitetura-multi-tenant)
- - [Sistema de Roles e Permissões](#sistema-de-roles-e-permissões)
- - [Tecnologias](#tecnologias)
- - [Instalação e Configuração](#instalação-e-configuração)
- - [Estrutura do Banco de Dados](#estrutura-do-banco-de-dados)
- - [Escalabilidade](#escalabilidade)
- - [Segurança](#segurança)
- - [Deploy](#deploy)
- - [Convenções do Código](#convenções-do-código)
+## 📋 Índice
+
+- [Visão Geral](#-visão-geral)
+- [Funcionalidades](#-funcionalidades)
+- [Páginas e Rotas (guia página-a-página)](#-páginas-e-rotas-guia-página-a-página)
+- [Arquitetura Multi-Tenant](#-arquitetura-multi-tenant)
+- [Sistema de Roles e Permissões](#-sistema-de-roles-e-permissões)
+- [Tecnologias](#-tecnologias)
+- [Instalação e Configuração](#-instalação-e-configuração)
+- [Estrutura do Banco de Dados](#-estrutura-do-banco-de-dados)
+- [Escalabilidade](#-escalabilidade)
+- [Segurança](#-segurança)
+- [Deploy](#-deploy)
+- [Convenções do Código](#-convenções-do-código)
+
  
  ## 🎯 Visão Geral
  
@@ -123,7 +125,230 @@
 - Regras de antecedência para agendamentos (horas ou dias) *(admin)*
 - **Segurança**: troca de senha do usuário logado *(admin e funcionários não-admin)*
  
- ## 🏢 Arquitetura Multi-Tenant
+## 🧭 Páginas e Rotas (guia página-a-página)
+
+> Fonte de verdade das rotas: `src/App.tsx`.
+
+### Visão rápida de módulos
+
+- **Backoffice (interno)**: dashboard + cadastros + operações + relatórios.
+- **Profissional**: agenda e comissões do próprio profissional.
+- **Portal do cliente (público + auth própria)**: login/cadastro do cliente, completar cadastro e agendar online.
+
+### Rotas públicas e autenticação
+
+#### `/auth`
+**Página:** `src/pages/Auth.tsx`
+- Login do **backoffice** via Supabase Auth (email/senha).
+- Suporta modo **recovery** (`type=recovery` no query/hash) para redefinição de senha.
+- Fluxo multi-tenant: se o email já existe, orienta a usar **Entrar** (conta Supabase é global por email).
+- Bloqueio de cliente no backoffice: se `state.blocked === "customer_backoffice"`, mostra tela explicando que cliente acessa via portal.
+
+#### `*` (catch-all)
+**Página:** `src/pages/NotFound.tsx`
+- 404 simples com link para `/`.
+
+### Portal do cliente (público)
+
+> Todas as rotas do portal usam o token público do estabelecimento: `:token` (campo `saloes.public_booking_token`).
+
+#### `/cliente/:token`
+**Página:** `src/pages/ClientePublico.tsx`
+- Valida o token via RPC (`portal_salao_by_token`).
+- Redireciona automaticamente para `/cliente/:token/entrar`.
+
+#### `/cliente/:token/entrar`
+**Página:** `src/pages/ClientePortalEntrar.tsx`
+- Login do cliente (auth **própria do portal**, via Edge Function `portal-login`).
+- Em caso de sucesso: salva `session_token` (Portal) e navega para `/cliente/:token/app`.
+
+#### `/cliente/:token/primeiro-acesso`
+**Página:** `src/pages/ClientePortalPrimeiroAcesso.tsx`
+- Cria acesso do cliente (via Edge Function `portal-register`).
+- Fluxo atual: **cadastro → volta para login** (sem auto-login) para manter o fluxo determinístico.
+
+#### `/cliente/:token/esqueci`
+**Página:** `src/pages/ClientePortalEsqueciSenha.tsx`
+- Solicita redefinição de senha via Edge Function `portal-password-reset-request`.
+
+#### `/cliente/:token/resetar-senha?code=...`
+**Página:** `src/pages/ClientePortalResetarSenha.tsx`
+- Confirma redefinição via Edge Function `portal-password-reset-confirm`.
+
+### Portal do cliente (área autenticada)
+
+> Estas rotas ficam atrás do `PortalGate` (`src/auth/PortalGate.tsx`), que consulta `portal-me`.
+
+#### `/cliente/:token/app`
+**Página:** `src/pages/ClientePortalApp.tsx`
+- Home do portal com atalhos para Serviços / Novo agendamento / Meus agendamentos.
+- Botão de logout chama `portal-logout` e limpa o token local.
+
+#### `/cliente/:token/cadastro`
+**Página:** `src/pages/ClientePortalCadastro.tsx`
+- "Complete seu cadastro": nome, telefone e data de nascimento.
+- Salva via `portal-cliente-upsert` e volta para `/app`.
+
+#### `/cliente/:token/servicos`
+**Página:** `src/pages/ClientePortalServicos.tsx`
+- Lista serviços disponíveis (via `portal-servicos-list`).
+- CTA "Agendar" leva para `/cliente/:token/novo`.
+
+#### `/cliente/:token/novo`
+**Página:** `src/pages/ClientePortalAgendamentoForm.tsx`
+- Fluxo de agendamento online:
+  1) Seleciona serviço (`portal-servicos-list`)
+  2) Seleciona profissional (`portal-profissionais-by-servico`)
+  3) Seleciona dia (calendário)
+  4) Seleciona horário (`portal-available-slots`)
+  5) Confirma (`portal-agendamento-create`)
+
+#### `/cliente/:token/agendamentos`
+**Página:** `src/pages/ClientePortalMeusAgendamentos.tsx`
+- Lista agendamentos do cliente (via `portal-agendamentos-list`).
+- Ação "Ver" abre o detalhe.
+
+#### `/cliente/:token/agendamentos/:id`
+**Página:** `src/pages/ClientePortalAgendamentoForm.tsx` (modo detalhe)
+- Exibe resumo do agendamento (via `portal-agendamento-get`).
+- Permite cancelar (`portal-agendamento-cancel`) e ir para editar.
+
+#### `/cliente/:token/agendamentos/:id/editar`
+**Página:** `src/pages/ClientePortalAgendamentoForm.tsx` (modo edição)
+- Permite escolher novo serviço/profissional/dia/hora e salvar (`portal-agendamento-update`).
+
+### Backoffice (interno) — Admin/Gerente/Recepcionista/Staff
+
+> Rotas protegidas por `AuthGate` + `BackofficeGate` + `RoleGate`.
+
+#### `/` (Dashboard)
+**Página:** `src/pages/Index.tsx`
+- KPIs: total de clientes, agendamentos do dia, serviços concluídos no mês.
+- Status dos agendamentos do dia (pendentes/agendados/concluídos/cancelados).
+- Tabela de próximos agendamentos.
+- Se não houver `salao_id`, orienta completar Configurações.
+
+#### `/agendamentos`
+**Página:** `src/pages/Agendamentos.tsx`
+- Calendário mensal + lista do dia, com filtro por status.
+- Ações por agendamento: editar, excluir, alterar status.
+- Ao concluir: solicita forma de pagamento e cria/atualiza `recebimentos`, depois marca `status=concluido`.
+- Exibe/gera **link público do portal** do cliente (`public_booking_token`) com copiar e regenerar.
+
+#### `/agendamentos/novo` e `/agendamentos/:id`
+**Página:** `src/pages/AgendamentoFormPage.tsx`
+- Cria/edita agendamento com validações:
+  - política de antecedência do salão (modo `horas` ou `proximo_dia`)
+  - bloqueia salvar no passado
+  - calcula horários livres via `useAvailableSlots`.
+- Modelo atual: 1 serviço por agendamento (reescreve `agendamento_itens` ao salvar).
+
+#### `/clientes`
+**Página:** `src/pages/Clientes.tsx`
+- Lista com busca (nome/telefone/email).
+- Mostra métricas agregadas por cliente:
+  - atendimentos concluídos
+  - cancelamentos
+  - serviços realizados.
+- Ações: editar e excluir.
+
+#### `/clientes/novo` e `/clientes/:id`
+**Página:** `src/pages/ClienteFormPage.tsx`
+- CRUD de cliente (nome/telefone/email/data de nascimento).
+- Valida email único por salão.
+- Máscara e conversão dd/mm/yyyy ↔ ISO.
+
+#### `/servicos`
+**Página:** `src/pages/Servicos.tsx`
+- Lista de serviços (duração/valor/ativo) com busca.
+- Mostra quantidade de profissionais vinculados.
+- Ações: editar e excluir (remove vínculos em `servicos_funcionarios`).
+
+#### `/servicos/novo` e `/servicos/:id`
+**Página:** `src/pages/ServicoFormPage.tsx`
+- CRUD de serviço + seleção dos profissionais que executam.
+
+#### `/funcionarios`
+**Página:** `src/pages/Funcionarios.tsx`
+- Lista com busca.
+- Exibe configurações principais (cargo, salário fixo, comissão %, status).
+- Admin pode criar/atualizar acesso via Edge Function (dialog `CreateStaffAccessDialog`).
+
+#### `/funcionarios/novo` e `/funcionarios/:id`
+**Página:** `src/pages/FuncionarioFormPage.tsx`
+- CRUD de funcionário + horários de trabalho por dia + almoço.
+- Para cargo "profissional": vincula serviços atendidos.
+- Admin pode resetar senha via Edge Function (`ResetStaffPasswordDialog`) quando houver `auth_user_id`.
+
+#### `/produtos`
+**Página:** `src/pages/Produtos.tsx`
+- Módulo com abas:
+  - **Catálogo** (`ProdutosCatalogo`)
+  - **Estoque (Baixas)** (`ProdutosEstoque`)
+  - **Vendas** (`ProdutosVendas`).
+
+##### Aba: Catálogo
+**Componente:** `src/pages/produtos/ProdutosCatalogo.tsx`
+- CRUD de produtos (nome, categoria, unidade, preço, custo médio, estoque atual/mínimo, ativo).
+- Destaque visual quando estoque atual ≤ estoque mínimo.
+
+##### Aba: Estoque (Baixas)
+**Componente:** `src/pages/produtos/ProdutosEstoque.tsx`
+- Registra **saída por consumo interno** (`movimentacoes_estoque.tipo = saida_consumo`).
+- Valida estoque disponível e atualiza `produtos.estoque_atual`.
+- Permite duplicar/remover linhas antes de salvar.
+
+##### Aba: Vendas
+**Componente:** `src/pages/produtos/ProdutosVendas.tsx`
+- Registra venda em `vendas_produtos` e a movimentação `saida_venda`.
+- Calcula `lucro_bruto` (total_venda − total_custo) e atualiza estoque.
+- Auto-preenche preço unitário ao selecionar produto (se vazio).
+
+#### `/relatorios`
+**Página:** `src/pages/Relatorios.tsx`
+- Página agregadora com filtros de período e competência (mês).
+- Inclui sub-relatórios:
+  - `RelatoriosComparativos`: receita bruta, comissões pagas, receita líquida (comparando período anterior).
+  - `RelatoriosConcluidosPorDiaSemana`: contagem de concluídos por dia da semana.
+  - `RelatoriosPorFuncionario`: performance e gestão de comissões não pagas (marcar como pago).
+  - `RelatoriosFluxoCaixa`: entradas/retiradas por forma de pagamento e saldo.
+  - `RelatoriosDespesas`: despesas variáveis + salários fixos + lucro final; marcação de despesas pagas.
+  - `RelatoriosProdutos`: movimentações de estoque e vendas (total e lucro).
+
+#### `/configuracoes`
+**Página:** `src/pages/Configuracoes.tsx`
+- Primeiro acesso: cria/edita dados do estabelecimento (salão).
+- Admin/Gerente podem anexar/remover logo (Supabase Storage `estabelecimento-logos`) e gravar `saloes.logo_url`.
+- Configura dias de funcionamento (`dias_funcionamento`) e política de antecedência do agendamento.
+- **Segurança:** troca de senha do usuário logado.
+  - Regra: funcionários não-admin veem apenas a área de senha.
+
+### Profissional (interno) — role `profissional`
+
+#### `/profissional/agendamentos`
+**Página:** `src/pages/ProfissionalAgendamentos.tsx`
+- Calendário mensal + lista do dia, com filtro por status.
+- Ações: editar, excluir, mudar status.
+- Exibe contador de cancelamentos do cliente (quando disponível via RLS).
+
+#### `/profissional/agendamentos/novo` e `/profissional/agendamentos/:id`
+**Página:** `src/pages/ProfissionalAgendamentoFormPage.tsx`
+- Cria/edita apenas agendamentos do próprio profissional.
+- Lista serviços vinculados ao profissional e calcula horários livres pelo próprio horário de trabalho.
+
+#### `/profissional/comissoes`
+**Página:** `src/pages/ProfissionalComissoes.tsx`
+- Lista comissões do profissional (pagas e pendentes), com busca por ID do agendamento.
+
+### Nota importante (mudança recente): headers do Portal vs Gateway
+
+Para evitar **401 do gateway** do Supabase ao chamar Edge Functions do portal:
+- `Authorization: Bearer <SUPABASE_ANON_KEY>` deve ser **sempre** o JWT do Supabase (anon/user).
+- O token de sessão do portal (custom) deve ir no header **`x-portal-session`**.
+
+Isso é implementado em `src/portal/portal-api.ts` e as Edge Functions priorizam `x-portal-session` na leitura da sessão.
+
+## 🏢 Arquitetura Multi-Tenant
  
  ### Conceito
  
@@ -311,10 +536,32 @@
    - **Edge Functions (Deno)** - Serverless functions
    - **Storage** - Upload de arquivos (logos)
  
- ### Edge Functions Implementadas
- - `admin-create-staff-user`: Criar usuários para funcionários
- - `admin-reset-staff-password`: Resetar senhas de staff
- - `seed-demo-data`: Popular dados de demonstração
+### Edge Functions Implementadas
+
+#### Backoffice / Admin
+- `admin-create-staff-user`: Criar usuários para funcionários
+- `admin-reset-staff-password`: Resetar senhas de staff
+- `seed-demo-data`: Popular dados de demonstração (idempotente)
+
+#### Portal do cliente (auth própria + agendamento público)
+- (Depende do RPC `portal_salao_by_token` para validar o token público do salão)
+- `portal-me`: Verifica sessão do portal e retorna dados do salão/conta/cliente
+- `portal-login`: Login do cliente e emissão de `session_token`
+- `portal-logout`: Revoga sessão atual
+- `portal-register`: Primeiro acesso (cria credencial do portal)
+- `portal-password-reset-request`: Solicita email de redefinição
+- `portal-password-reset-confirm`: Confirma redefinição por código
+- `portal-cliente-upsert`: Completa/atualiza cadastro do cliente
+- `portal-servicos-list`: Lista serviços públicos do salão
+- `portal-profissionais-by-servico`: Lista profissionais por serviço
+- `portal-profissional-dias`: Retorna dias da semana atendidos pelo profissional
+- `portal-available-slots`: Calcula horários disponíveis
+- `portal-agendamentos-list`: Lista agendamentos do cliente
+- `portal-agendamento-get`: Busca detalhe de um agendamento
+- `portal-agendamento-create`: Cria agendamento
+- `portal-agendamento-update`: Reagenda/edita
+- `portal-agendamento-cancel`: Cancela agendamento
+
  
  ## ⚙️ Instalação e Configuração
  
