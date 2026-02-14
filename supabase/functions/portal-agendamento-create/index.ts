@@ -112,6 +112,8 @@ function rangesOverlap(startA: number, endA: number, startB: number, endB: numbe
 }
 
 serve(async (req) => {
+
+  const { headers: corsHeaders, originAllowed } = buildCorsHeaders(req, { denyMode: "strict" });
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   if (!originAllowed) {

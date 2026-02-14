@@ -95,6 +95,8 @@ async function requirePortalSession(sb: ReturnType<typeof getServiceClient>, req
 }
 
 serve(async (req) => {
+
+  const { headers: corsHeaders, originAllowed } = buildCorsHeaders(req, { denyMode: "strict" });
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   if (!originAllowed) {
