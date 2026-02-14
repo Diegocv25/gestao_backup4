@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.93.2";
+import { getBaseUrl } from \"../_shared/base-url.ts\";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -102,9 +103,8 @@ serve(async (req) => {
     });
     if (insErr) throw insErr;
 
-    const resetUrl = `https://id-preview--2195ef19-036f-4926-9a8e-4b3085c4a170.lovable.app/cliente/${encodeURIComponent(
-      token.trim(),
-    )}/resetar-senha?code=${encodeURIComponent(rawCode)}`;
+    const authBase = getBaseUrl("auth").replace(/\/+$/, "");
+    const resetUrl = `${authBase}/cliente/${encodeURIComponent(token.trim())}/resetar-senha?code=${encodeURIComponent(rawCode)}`;
 
     const emailPayload = {
       from: "Portal <onboarding@resend.dev>",
