@@ -95,7 +95,7 @@ async function requirePortalSession(sb: ReturnType<typeof getServiceClient>, req
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req) });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
     const { token, agendamento_id } = (await req.json()) as { token?: string; agendamento_id?: string };

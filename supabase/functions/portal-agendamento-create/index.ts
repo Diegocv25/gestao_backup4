@@ -112,7 +112,7 @@ function rangesOverlap(startA: number, endA: number, startB: number, endB: numbe
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req) });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
     const { token, servico_id, funcionario_id, dia, hora, tz_offset_minutes } = (await req.json()) as {

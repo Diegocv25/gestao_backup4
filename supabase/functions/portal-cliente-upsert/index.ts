@@ -111,7 +111,7 @@ function parseDataNascimento(value: string | undefined) {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req) });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
     const { token, nome, telefone, data_nascimento } = (await req.json()) as {
