@@ -97,6 +97,13 @@ async function requirePortalSession(sb: ReturnType<typeof getServiceClient>, req
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  if (!originAllowed) {
+    return new Response(JSON.stringify({ ok: false, error: "Origin not allowed" }), {
+      status: 403,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
+  }
+
   try {
     const { token, agendamento_id } = (await req.json()) as { token?: string; agendamento_id?: string };
     if (!token || !token.trim()) return json(req, { ok: false, error: "token obrigatório" }, { status: 400 });

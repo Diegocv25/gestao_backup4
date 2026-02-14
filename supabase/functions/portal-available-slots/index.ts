@@ -154,6 +154,13 @@ function parseDia(dia: string) {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  if (!originAllowed) {
+    return new Response(JSON.stringify({ ok: false, error: "Origin not allowed" }), {
+      status: 403,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
+  }
+
   try {
     const { token, servico_id, funcionario_id, dia, tz_offset_minutes } = (await req.json()) as {
       token?: string;

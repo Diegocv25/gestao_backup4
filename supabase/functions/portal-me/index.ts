@@ -71,6 +71,13 @@ function getBearer(req: Request) {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  if (!originAllowed) {
+    return new Response(JSON.stringify({ ok: false, error: "Origin not allowed" }), {
+      status: 403,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
+  }
+
   try {
     const { token } = (await req.json()) as { token?: string };
     if (!token || !token.trim()) return json(req, { ok: false, error: "token obrigatório" }, { status: 400 });
