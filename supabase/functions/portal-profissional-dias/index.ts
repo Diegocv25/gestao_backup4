@@ -1,21 +1,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.93.2";
-
-function getCorsHeaders(req: Request) {
-  const origin = req.headers.get("origin") ?? "";
-  const allowed = /^(https:\/\/.*\.(lovable\.app|lovableproject\.com)|http:\/\/localhost(:\d+)?)$/.test(origin);
-  return {
-    "Access-Control-Allow-Origin": allowed ? origin : "https://id-preview--2195ef19-036f-4926-9a8e-4b3085c4a170.lovable.app",
-    Vary: "Origin",
-    "Access-Control-Allow-Credentials": "true",
-    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-    "Access-Control-Allow-Headers":
-      "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version, x-portal-session",
-  };
-}
+import { buildCorsHeaders } from "../_shared/cors.ts";
 
 function json(req: Request, data: unknown, init?: ResponseInit) {
-  const corsHeaders = getCorsHeaders(req);
+  const { headers: corsHeaders, originAllowed } = buildCorsHeaders(req, { denyMode: "strict" });
   return new Response(JSON.stringify(data), {
     ...init,
     headers: { "Content-Type": "application/json", ...corsHeaders, ...(init?.headers ?? {}) },
@@ -107,7 +95,16 @@ async function requirePortalSession(sb: ReturnType<typeof getServiceClient>, req
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req) });
+
+  const { headers: corsHeaders, originAllowed } = buildCorsHeaders(req, { denyMode: "strict" });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  if (!originAllowed) {
+    return new Response(JSON.stringify({ ok: false, error: "Origin not allowed" }), {
+      status: 403,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
+  }
 
   try {
     const { token, funcionario_id } = (await req.json()) as { token?: string; funcionario_id?: string };
