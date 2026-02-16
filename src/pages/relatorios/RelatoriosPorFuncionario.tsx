@@ -17,8 +17,10 @@ import { formatBRL, safeNumber, toFimDateExclusivo, toInicioDate } from "@/pages
 type Row = {
   funcionario: string;
   servicosRealizados: number;
-  comissaoPaga: number;
-  comissaoPendente: number;
+  vendasProdutos: number;
+  comissaoServicosPaga: number;
+  comissaoServicosPendente: number;
+  comissaoProdutos: number;
   receitaBruta: number;
   rendaSalao: number;
 };
@@ -32,7 +34,7 @@ export default function RelatoriosPorFuncionario({ inicio, fim }: { inicio: stri
     queryKey: ["relatorios", "por_funcionario", { salaoId, inicio, fim }],
     enabled: !!salaoId && !!inicio && !!fim,
     queryFn: async () => {
-      const [funcs, ags, comCalc, comPagas, comPendentes] = await Promise.all([
+      const [funcs, ags, vendasProdutos, comCalc, comPagas, comPendentes] = await Promise.all([
         supabase.from("funcionarios").select("id,nome").eq("salao_id", salaoId as string),
 
         supabase
@@ -42,6 +44,13 @@ export default function RelatoriosPorFuncionario({ inicio, fim }: { inicio: stri
           .eq("status", "concluido")
           .gte("data_hora_inicio", inicioDate.toISOString())
           .lt("data_hora_inicio", fimDateExclusivo.toISOString()),
+
+        supabase
+          .from("vendas_produtos")
+          .select("funcionario_id,total_venda,total_custo,comissao_funcionario")
+          .eq("salao_id", salaoId as string)
+          .gte("created_at", inicioDate.toISOString())
+          .lt("created_at", fimDateExclusivo.toISOString()),
 
         supabase
           .from("comissoes")
@@ -67,7 +76,7 @@ export default function RelatoriosPorFuncionario({ inicio, fim }: { inicio: stri
           .lt("created_at", fimDateExclusivo.toISOString()),
       ]);
 
-      const errors = [funcs.error, ags.error, comCalc.error, comPagas.error, comPendentes.error].filter(Boolean);
+      const errors = [funcs.error, ags.error, vendasProdutos.error, comCalc.error, comPagas.error, comPendentes.error].filter(Boolean);
       if (errors.length) throw errors[0];
 
       const nomePorId = new Map<string, string>((funcs.data ?? []).map((f: any) => [String(f.id), String(f.nome ?? "(Sem nome)")]));
@@ -80,8 +89,10 @@ export default function RelatoriosPorFuncionario({ inicio, fim }: { inicio: stri
           acc.set(key, {
             funcionario: nome,
             servicosRealizados: 0,
-            comissaoPaga: 0,
-            comissaoPendente: 0,
+            vendasProdutos: 0,
+            comissaoServicosPaga: 0,
+            comissaoServicosPendente: 0,
+            comissaoProdutos: 0,
             receitaBruta: 0,
             rendaSalao: 0,
           });
@@ -103,20 +114,31 @@ export default function RelatoriosPorFuncionario({ inicio, fim }: { inicio: stri
         r.rendaSalao += safeNumber(a.total_valor) - comCalcValor;
       });
 
+      (vendasProdutos.data ?? []).forEach((v: any) => {
+        const funcId = String(v.funcionario_id);
+        const r = ensure(funcId);
+        r.vendasProdutos += 1;
+        r.receitaBruta += safeNumber(v.total_venda);
+        const custo = safeNumber(v.total_custo);
+        const comissaoProduto = safeNumber(v.comissao_funcionario);
+        r.comissaoProdutos += comissaoProduto;
+        r.rendaSalao += safeNumber(v.total_venda) - custo - comissaoProduto;
+      });
+
       (comPagas.data ?? []).forEach((c: any) => {
         const funcId = String(c.funcionario_id);
         const r = ensure(funcId);
-        r.comissaoPaga += safeNumber(c.valor_calculado);
+        r.comissaoServicosPaga += safeNumber(c.valor_calculado);
       });
 
       (comPendentes.data ?? []).forEach((c: any) => {
         const funcId = String(c.funcionario_id);
         const r = ensure(funcId);
-        r.comissaoPendente += safeNumber(c.valor_calculado);
+        r.comissaoServicosPendente += safeNumber(c.valor_calculado);
       });
 
       const rows = Array.from(acc.values())
-        .filter((r) => r.servicosRealizados > 0 || r.comissaoPaga > 0 || r.receitaBruta > 0)
+        .filter((r) => r.servicosRealizados > 0 || r.vendasProdutos > 0 || r.comissaoServicosPaga > 0 || r.comissaoProdutos > 0 || r.receitaBruta > 0)
         .sort((a, b) => b.rendaSalao - a.rendaSalao);
 
       return { rows };
@@ -219,8 +241,10 @@ export default function RelatoriosPorFuncionario({ inicio, fim }: { inicio: stri
               <TableRow>
                 <TableHead>Funcionário</TableHead>
                 <TableHead className="text-right">Serviços</TableHead>
-                <TableHead className="text-right">Comissão paga</TableHead>
-                <TableHead className="text-right">Comissão não paga</TableHead>
+                <TableHead className="text-right">Vendas prod.</TableHead>
+                <TableHead className="text-right">Comissão serv. paga</TableHead>
+                <TableHead className="text-right">Comissão serv. pendente</TableHead>
+                <TableHead className="text-right">Comissão produtos</TableHead>
                 <TableHead className="text-right">Receita bruta</TableHead>
                 <TableHead className="text-right">Renda p/ salão</TableHead>
               </TableRow>
@@ -230,8 +254,10 @@ export default function RelatoriosPorFuncionario({ inicio, fim }: { inicio: stri
                 <TableRow key={r.funcionario}>
                   <TableCell className="max-w-[260px] truncate">{r.funcionario}</TableCell>
                   <TableCell className="text-right tabular-nums">{r.servicosRealizados}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatBRL(r.comissaoPaga)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatBRL(r.comissaoPendente)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{r.vendasProdutos}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatBRL(r.comissaoServicosPaga)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatBRL(r.comissaoServicosPendente)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatBRL(r.comissaoProdutos)}</TableCell>
                   <TableCell className="text-right tabular-nums">{formatBRL(r.receitaBruta)}</TableCell>
                   <TableCell className="text-right tabular-nums">{formatBRL(r.rendaSalao)}</TableCell>
                 </TableRow>
@@ -239,7 +265,7 @@ export default function RelatoriosPorFuncionario({ inicio, fim }: { inicio: stri
 
               {(porFuncionarioQuery.data?.rows ?? []).length === 0 && !porFuncionarioQuery.isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-sm text-muted-foreground">
+                  <TableCell colSpan={8} className="text-sm text-muted-foreground">
                     Nenhum dado no período.
                   </TableCell>
                 </TableRow>

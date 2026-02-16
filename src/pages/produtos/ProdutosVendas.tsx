@@ -30,7 +30,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
      queryFn: async () => {
        const { data, error } = await supabase
          .from("produtos")
-         .select("id, nome, preco_venda, custo_medio, estoque_atual")
+         .select("id, nome, preco_venda, custo_medio, estoque_atual, comissao_valor_fixo")
          .eq("salao_id", salaoId as string)
          .eq("ativo", true)
          .order("nome");
@@ -69,6 +69,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
        const totalVenda = quantidade * precoUnitario;
        const totalCusto = quantidade * produto.custo_medio;
        const lucroBruto = totalVenda - totalCusto;
+       const comissaoFuncionario = quantidade * Number(produto.comissao_valor_fixo ?? 0);
  
        // Registra venda
        const { error: vendaError } = await supabase.from("vendas_produtos").insert([
@@ -81,6 +82,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
            custo_unitario: produto.custo_medio,
            total_custo: totalCusto,
            lucro_bruto: lucroBruto,
+           comissao_funcionario: comissaoFuncionario,
            funcionario_id: row.funcionario_id,
            forma_pagamento: row.forma_pagamento || null,
            cliente_nome: row.cliente_nome || null,
