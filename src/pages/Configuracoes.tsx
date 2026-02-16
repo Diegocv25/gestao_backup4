@@ -672,41 +672,45 @@ export default function ConfiguracoesPage() {
         </>
       ) : null}
 
-      <Card>
-        <CardContent className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-medium">Pagamento da assinatura</p>
-            <p className="text-xs text-muted-foreground">Plano atual: {currentPlanLabel}</p>
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Button asChild size="sm">
-              <a href={checkoutCurrentPlan} target="_blank" rel="noreferrer" aria-label="Pagar assinatura no checkout">
-                Pagar plano atual
-              </a>
-            </Button>
-            <Button asChild variant="outline" size="sm">
-              <a href={checkoutUpgradePlan} target="_blank" rel="noreferrer" aria-label="Alterar plano no checkout">
-                {upgradeLabel}
-              </a>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {!isStaffNonAdmin ? (
+        <>
+          <Card>
+            <CardContent className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-medium">Pagamento da assinatura</p>
+                <p className="text-xs text-muted-foreground">Plano atual: {currentPlanLabel}</p>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button asChild size="sm">
+                  <a href={checkoutCurrentPlan} target="_blank" rel="noreferrer" aria-label="Pagar assinatura no checkout">
+                    Pagar plano atual
+                  </a>
+                </Button>
+                <Button asChild variant="outline" size="sm">
+                  <a href={checkoutUpgradePlan} target="_blank" rel="noreferrer" aria-label="Alterar plano no checkout">
+                    {upgradeLabel}
+                  </a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
-      <Card>
-        <CardContent className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-medium">Suporte Nexus Automações</p>
-            <p className="text-xs text-muted-foreground">WhatsApp: (48) 99101-5688</p>
-          </div>
-          <Button asChild variant="outline" size="sm">
-            <a href={SUPPORT_WHATSAPP_URL} target="_blank" rel="noreferrer" aria-label="Falar com suporte no WhatsApp">
-              <MessageCircle className="h-4 w-4" />
-              WhatsApp suporte
-            </a>
-          </Button>
-        </CardContent>
-      </Card>
+          <Card>
+            <CardContent className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-medium">Suporte Nexus Automações</p>
+                <p className="text-xs text-muted-foreground">WhatsApp: (48) 99101-5688</p>
+              </div>
+              <Button asChild variant="outline" size="sm">
+                <a href={SUPPORT_WHATSAPP_URL} target="_blank" rel="noreferrer" aria-label="Falar com suporte no WhatsApp">
+                  <MessageCircle className="h-4 w-4" />
+                  WhatsApp suporte
+                </a>
+              </Button>
+            </CardContent>
+          </Card>
+        </>
+      ) : null}
     </FormPageShell>
   );
 }
