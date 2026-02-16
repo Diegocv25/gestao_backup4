@@ -209,8 +209,8 @@ export default function ClientePortalAgendamentoFormPage() {
 
   return (
     <PortalShell
-      title={agendamentoId ? "Detalhes do agendamento" : "Novo agendamento"}
-      subtitle={salaoQuery.data ? `Salão: ${salaoQuery.data.nome}` : undefined}
+      title="Portal do Cliente"
+      subtitle={salaoQuery.data?.nome}
       logoUrl={salaoQuery.data?.logo_url}
       onBack={() => nav(`/cliente/${tokenValue}/app`)}
       maxWidth="3xl"

@@ -33,7 +33,7 @@ export default function ClientePortalMeusAgendamentosPage() {
   });
 
   return (
-    <PortalShell title="Meus agendamentos" maxWidth="3xl" logoUrl={salaoQuery.data?.logo_url}>
+    <PortalShell title="Portal do Cliente" subtitle={salaoQuery.data?.nome} maxWidth="3xl" logoUrl={salaoQuery.data?.logo_url}>
       <div className="mb-4 flex flex-col gap-2 sm:flex-row">
         <Button variant="secondary" onClick={() => nav(`/cliente/${tokenValue}/app`)}>
           Voltar
