@@ -803,14 +803,7 @@ Isso é implementado em `src/portal/portal-api.ts` e as Edge Functions priorizam
  
  ## 🚀 Deploy
  
- ### Via Lovable (Recomendado)
- 
- 1. Acesse o projeto no [Lovable](https://lovable.dev)
- 2. Clique em **Share → Publish**
- 3. Aguarde o deploy automático
- 4. Configure domínio customizado (opcional em Settings → Domains)
- 
- ### Via Vercel
+ ### Via Vercel (Recomendado)
  
  ```bash
  # Build do projeto
@@ -965,7 +958,7 @@ src/
  ## 📞 Suporte e Documentação
  
  - 📖 [Documentação do Supabase](https://supabase.com/docs)
- - 📖 [Documentação do Lovable](https://docs.lovable.dev)
+ - 📖 [Documentação da Vercel](https://vercel.com/docs)
  - 📖 [React Documentation](https://react.dev)
  - 📖 [TanStack Query](https://tanstack.com/query/latest)
  - 📖 [shadcn/ui](https://ui.shadcn.com)
@@ -976,4 +969,4 @@ src/
  
  ---
  
- **Desenvolvido com ❤️ usando Lovable, React, TypeScript e Supabase**
+ **Desenvolvido com ❤️ usando React, TypeScript e Supabase**
