@@ -41,6 +41,10 @@ type DiaFuncionamentoForm = {
 
 const diasLabel = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const SUPPORT_WHATSAPP_URL = "https://wa.me/5548991015688";
+const KIWIFY_CHECKOUTS = {
+  profissional: "https://pay.kiwify.com.br/H5429N1",
+  pro_ia: "https://pay.kiwify.com.br/Bru2N8Q",
+} as const;
 
 function defaultDia(salaoId: string, dia: number): DiaFuncionamentoForm {
   const fechado = dia === 0;
@@ -70,6 +74,24 @@ export default function ConfiguracoesPage() {
       const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", user!.id);
       if (error) throw error;
       return (data ?? []).map((r: any) => r.role) as string[];
+    },
+  });
+
+  const subscriptionQuery = useQuery({
+    queryKey: ["subscription-current", user?.email],
+    enabled: !!user?.email,
+    queryFn: async () => {
+      const client = supabase as any;
+      const { data, error } = await client
+        .from("subscriptions")
+        .select("status,product_id,product_name,updated_at")
+        .eq("provider", "kiwify")
+        .eq("customer_email", String(user?.email ?? "").toLowerCase())
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data ?? null;
     },
   });
 
@@ -291,6 +313,19 @@ export default function ConfiguracoesPage() {
   const isStaffNonAdmin = role !== null && role !== "admin";
 
   const canEditDias = !!salaoQuery.data?.id;
+
+  const currentPlanId = useMemo<"profissional" | "pro_ia">(() => {
+    const s = subscriptionQuery.data as any;
+    const pid = String(s?.product_id ?? "").toLowerCase();
+    const pname = String(s?.product_name ?? "").toLowerCase();
+    if (pid.includes("pro_ia") || pname.includes("pro") || pname.includes("ia")) return "pro_ia";
+    return "profissional";
+  }, [subscriptionQuery.data]);
+
+  const checkoutCurrentPlan = KIWIFY_CHECKOUTS[currentPlanId];
+  const checkoutUpgradePlan = currentPlanId === "profissional" ? KIWIFY_CHECKOUTS.pro_ia : KIWIFY_CHECKOUTS.profissional;
+  const currentPlanLabel = currentPlanId === "pro_ia" ? "PRO + IA" : "Profissional";
+  const upgradeLabel = currentPlanId === "profissional" ? "Upgrade para PRO + IA" : "Trocar para Profissional";
 
   const changePasswordSchema = useMemo(
     () =>
@@ -636,6 +671,27 @@ export default function ConfiguracoesPage() {
           <AvisosSemanaisCard salaoId={salaoQuery.data?.id} />
         </>
       ) : null}
+
+      <Card>
+        <CardContent className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-medium">Pagamento da assinatura</p>
+            <p className="text-xs text-muted-foreground">Plano atual: {currentPlanLabel}</p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button asChild size="sm">
+              <a href={checkoutCurrentPlan} target="_blank" rel="noreferrer" aria-label="Pagar assinatura no checkout">
+                Pagar plano atual
+              </a>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <a href={checkoutUpgradePlan} target="_blank" rel="noreferrer" aria-label="Alterar plano no checkout">
+                {upgradeLabel}
+              </a>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
