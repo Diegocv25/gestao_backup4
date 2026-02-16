@@ -49,10 +49,12 @@ const allItems = {
     { title: "Agendamentos", url: "/agendamentos", icon: CalendarDays, end: true },
     { title: "Clientes", url: "/clientes", icon: Users },
     { title: "Serviços", url: "/servicos", icon: Scissors },
+    { title: "Produtos", url: "/produtos", icon: Package },
   ],
   profissional: [
     { title: "Meus agendamentos", url: "/profissional/agendamentos", icon: CalendarDays, end: true },
     { title: "Minhas comissões", url: "/profissional/comissoes", icon: Wallet },
+    { title: "Produtos", url: "/produtos", icon: Package },
   ],
   staff: [
     { title: "Dashboard", url: "/", icon: LayoutDashboard, end: true },
