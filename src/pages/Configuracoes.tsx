@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import { Paperclip } from "lucide-react";
+import { MessageCircle, Paperclip } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/auth/auth-context";
@@ -40,6 +40,7 @@ type DiaFuncionamentoForm = {
 };
 
 const diasLabel = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const SUPPORT_WHATSAPP_URL = "https://wa.me/5548991015688";
 
 function defaultDia(salaoId: string, dia: number): DiaFuncionamentoForm {
   const fechado = dia === 0;
@@ -635,6 +636,21 @@ export default function ConfiguracoesPage() {
           <AvisosSemanaisCard salaoId={salaoQuery.data?.id} />
         </>
       ) : null}
+
+      <Card>
+        <CardContent className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-medium">Suporte Nexus Automações</p>
+            <p className="text-xs text-muted-foreground">WhatsApp: (48) 99101-5688</p>
+          </div>
+          <Button asChild variant="outline" size="sm">
+            <a href={SUPPORT_WHATSAPP_URL} target="_blank" rel="noreferrer" aria-label="Falar com suporte no WhatsApp">
+              <MessageCircle className="h-4 w-4" />
+              WhatsApp suporte
+            </a>
+          </Button>
+        </CardContent>
+      </Card>
     </FormPageShell>
   );
 }
