@@ -24,10 +24,9 @@ function isProIA(sub: any) {
 }
 
 serve(async (req) => {
-  const { headers: corsHeaders, originAllowed } = buildCorsHeaders(req, { allowMethods: ["POST", "OPTIONS"], denyMode: "fallback-null" });
+  const { headers: corsHeaders } = buildCorsHeaders(req, { allowMethods: ["POST", "OPTIONS"], denyMode: "fallback-null" });
 
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  if (!originAllowed) return json({ ok: false, error: "origin_not_allowed" }, { status: 403 }, corsHeaders);
   if (req.method !== "POST") return json({ ok: false, error: "method_not_allowed" }, { status: 405 }, corsHeaders);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
