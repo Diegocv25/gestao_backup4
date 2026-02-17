@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import { MessageCircle, Paperclip } from "lucide-react";
+import { Bot, MessageCircle, Paperclip } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/auth/auth-context";
 import { useAccess } from "@/auth/access-context";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -674,6 +675,25 @@ export default function ConfiguracoesPage() {
 
       {!isStaffNonAdmin ? (
         <>
+          <Card>
+            <CardContent className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-medium">Configuração da IA</p>
+                <p className="text-xs text-muted-foreground">
+                  {currentPlanId === "pro_ia"
+                    ? "Seu plano atual inclui onboarding da IA no próprio sistema."
+                    : "Disponível apenas no plano PRO + IA."}
+                </p>
+              </div>
+              <Button asChild size="sm" disabled={currentPlanId !== "pro_ia"}>
+                <Link to="/configuracoes/ia" aria-label="Abrir configuração da IA">
+                  <Bot className="h-4 w-4" />
+                  Configurar IA
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardContent className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
               <div>

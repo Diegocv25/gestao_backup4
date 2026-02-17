@@ -24,6 +24,7 @@ import FuncionariosPage from "./pages/Funcionarios";
 import RelatoriosPage from "./pages/Relatorios";
 import ProdutosPage from "./pages/Produtos";
 import ConfiguracoesPage from "./pages/Configuracoes";
+import ConfiguracoesIAPage from "./pages/ConfiguracoesIA";
 import ClientePublicoPage from "./pages/ClientePublico";
 import ClientePortalAppPage from "./pages/ClientePortalApp";
 import ClientePortalMeusAgendamentosPage from "./pages/ClientePortalMeusAgendamentos";
@@ -87,6 +88,7 @@ const App = () => (
 
                   {/* Configurações (onboarding): acessível para usuário logado mesmo sem role */}
                   <Route path="/configuracoes" element={<ConfiguracoesPage />} />
+                  <Route path="/configuracoes/ia" element={<ConfiguracoesIAPage />} />
 
                   {/* Produtos (também disponível para profissional) */}
                   <Route element={<RoleGate allowed={["admin", "staff", "gerente", "recepcionista", "profissional"]} />}>
