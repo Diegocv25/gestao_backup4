@@ -31,7 +31,7 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const n8nIngestUrl = Deno.env.get("N8N_RAG_INGEST_URL") || "https://n8nfila-n8n-webhook.elzqmm.easypanel.host/webhook/retorno_html";
+  const n8nIngestUrl = Deno.env.get("N8N_RAG_INGEST_URL") || "https://n8nfila-n8n-editor.elzqmm.easypanel.host/webhook/retorno_html";
 
   if (!supabaseUrl || !serviceRoleKey) {
     return json({ ok: false, error: "missing_env" }, { status: 500 }, corsHeaders);
