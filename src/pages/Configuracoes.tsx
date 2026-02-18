@@ -464,7 +464,7 @@ export default function ConfiguracoesPage() {
                   <Input id="nome" value={form.nome} onChange={(e) => setForm((p) => ({ ...p, nome: e.target.value }))} />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="tel">Telefone</Label>
+                  <Label htmlFor="tel">Telefone (No plano PRO+IA será utilizada no atendente do WhatsApp)</Label>
                   <Input id="tel" value={form.telefone ?? ""} onChange={(e) => setForm((p) => ({ ...p, telefone: e.target.value }))} />
                 </div>
                 <div className="grid gap-2">
