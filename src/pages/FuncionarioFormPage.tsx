@@ -32,6 +32,8 @@ type FuncForm = {
   telefone?: string;
   email?: string;
   ativo: boolean;
+  data_admissao?: string;
+  data_inatividade?: string;
   salario_fixo_mensal: number;
   comissao_percentual: number;
   servicoIds: string[];
@@ -66,6 +68,8 @@ export default function FuncionarioFormPage() {
     telefone: "",
     email: "",
     ativo: true,
+    data_admissao: new Date().toISOString().slice(0, 10),
+    data_inatividade: "",
     salario_fixo_mensal: 0,
     comissao_percentual: 0,
     servicoIds: [],
@@ -79,7 +83,7 @@ export default function FuncionarioFormPage() {
       const { data, error } = await supabase
         .from("funcionarios")
         .select(
-          "id,nome,carga,telefone,email,ativo,recebe_salario_fixo,salario_fixo_mensal,comissao_tipo,comissao_percentual,comissao_valor_fixo,auth_user_id",
+          "id,nome,carga,telefone,email,ativo,data_admissao,data_inatividade,recebe_salario_fixo,salario_fixo_mensal,comissao_tipo,comissao_percentual,comissao_valor_fixo,auth_user_id",
         )
         .eq("id", editingId as string)
         .maybeSingle();
@@ -161,6 +165,8 @@ export default function FuncionarioFormPage() {
       telefone: f.telefone ?? "",
       email: f.email ?? "",
       ativo: !!f.ativo,
+      data_admissao: f.data_admissao ?? "",
+      data_inatividade: f.data_inatividade ?? "",
       salario_fixo_mensal: Number(f.salario_fixo_mensal ?? 0),
       comissao_percentual: Number(f.comissao_percentual ?? 0),
       servicoIds: funcionarioServicosQuery.data ?? [],
@@ -176,6 +182,10 @@ export default function FuncionarioFormPage() {
       const recebe_salario_fixo = salario_fixo_mensal > 0;
       const comissao_percentual = Number(payload.comissao_percentual ?? 0);
 
+      const dataInatividade = payload.ativo
+        ? null
+        : payload.data_inatividade || new Date().toISOString().slice(0, 10);
+
       const { data: saved, error } = await supabase
         .from("funcionarios")
         .upsert({
@@ -186,6 +196,8 @@ export default function FuncionarioFormPage() {
           telefone: payload.telefone?.trim() || null,
           email: payload.email?.trim() || null,
           ativo: payload.ativo,
+          data_admissao: payload.data_admissao || null,
+          data_inatividade: dataInatividade,
           recebe_salario_fixo,
           salario_fixo_mensal,
           // Modelo simplificado: comissão é sempre percentual (0 quando vazio)
@@ -315,13 +327,42 @@ export default function FuncionarioFormPage() {
                 <Label>Email</Label>
                 <Input type="email" value={form.email ?? ""} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
               </div>
+              <div className="grid gap-2">
+                <Label>Data de admissão</Label>
+                <Input
+                  type="date"
+                  value={form.data_admissao ?? ""}
+                  onChange={(e) => setForm((p) => ({ ...p, data_admissao: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Data de inatividade</Label>
+                <Input
+                  type="date"
+                  value={form.data_inatividade ?? ""}
+                  disabled={form.ativo}
+                  onChange={(e) => setForm((p) => ({ ...p, data_inatividade: e.target.value }))}
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="grid gap-2">
                 <Label>Status</Label>
                 <label className="flex items-center gap-2 text-sm">
-                  <Checkbox checked={form.ativo} onCheckedChange={(v) => setForm((p) => ({ ...p, ativo: Boolean(v) }))} />
+                  <Checkbox
+                    checked={form.ativo}
+                    onCheckedChange={(v) =>
+                      setForm((p) => {
+                        const nextAtivo = Boolean(v);
+                        return {
+                          ...p,
+                          ativo: nextAtivo,
+                          data_inatividade: nextAtivo ? "" : p.data_inatividade || new Date().toISOString().slice(0, 10),
+                        };
+                      })
+                    }
+                  />
                   Ativo
                 </label>
               </div>

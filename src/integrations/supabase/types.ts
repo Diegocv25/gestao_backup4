@@ -416,6 +416,8 @@ export type Database = {
           comissao_tipo: Database["public"]["Enums"]["comissao_tipo"]
           comissao_valor_fixo: number | null
           created_at: string
+          data_admissao: string | null
+          data_inatividade: string | null
           email: string | null
           id: string
           nome: string
@@ -433,6 +435,8 @@ export type Database = {
           comissao_tipo?: Database["public"]["Enums"]["comissao_tipo"]
           comissao_valor_fixo?: number | null
           created_at?: string
+          data_admissao?: string | null
+          data_inatividade?: string | null
           email?: string | null
           id?: string
           nome: string
@@ -450,6 +454,8 @@ export type Database = {
           comissao_tipo?: Database["public"]["Enums"]["comissao_tipo"]
           comissao_valor_fixo?: number | null
           created_at?: string
+          data_admissao?: string | null
+          data_inatividade?: string | null
           email?: string | null
           id?: string
           nome?: string
