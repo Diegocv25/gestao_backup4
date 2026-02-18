@@ -12,6 +12,7 @@ import { AccessProvider } from "@/auth/access-context";
 import { RoleGate } from "@/auth/RoleGate";
 import { PortalGate } from "@/auth/PortalGate";
 import { BackofficeGate } from "@/auth/BackofficeGate";
+import { FuncionariosRouteGate } from "@/auth/FuncionariosRouteGate";
 
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -110,9 +111,11 @@ const App = () => (
                     <Route path="/servicos/novo" element={<ServicoFormPage />} />
                     <Route path="/servicos/:id" element={<ServicoFormPage />} />
 
-                    <Route path="/funcionarios" element={<FuncionariosPage />} />
-                    <Route path="/funcionarios/novo" element={<FuncionarioFormPage />} />
-                    <Route path="/funcionarios/:id" element={<FuncionarioFormPage />} />
+                    <Route element={<FuncionariosRouteGate />}>
+                      <Route path="/funcionarios" element={<FuncionariosPage />} />
+                      <Route path="/funcionarios/novo" element={<FuncionarioFormPage />} />
+                      <Route path="/funcionarios/:id" element={<FuncionarioFormPage />} />
+                    </Route>
 
                     <Route path="/relatorios" element={<RelatoriosPage />} />
                   </Route>

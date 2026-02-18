@@ -8,6 +8,8 @@ type AccessContextValue = {
   role: AppRole | null;
   salaoId: string | null;
   funcionarioId: string | null;
+  funcionarioAtivo: boolean | null;
+  canManageFuncionarios: boolean;
   loading: boolean;
 };
 
@@ -18,6 +20,7 @@ export function AccessProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<AppRole | null>(null);
   const [salaoId, setSalaoId] = useState<string | null>(null);
   const [funcionarioId, setFuncionarioId] = useState<string | null>(null);
+  const [funcionarioAtivo, setFuncionarioAtivo] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -30,6 +33,7 @@ export function AccessProvider({ children }: { children: React.ReactNode }) {
           setRole(null);
           setSalaoId(null);
           setFuncionarioId(null);
+          setFuncionarioAtivo(null);
           setLoading(false);
         }
         return;
@@ -37,7 +41,7 @@ export function AccessProvider({ children }: { children: React.ReactNode }) {
 
       setLoading(true);
       try {
-        // NOTE: types.ts é read-only e pode estar defasado (novas colunas); por isso usamos `as any`.
+        // NOTE: types.ts pode estar defasado; usamos any para colunas novas.
         const sb = supabase as any;
         const { data: roles, error: rolesErr } = await sb
           .from("user_roles")
@@ -51,20 +55,27 @@ export function AccessProvider({ children }: { children: React.ReactNode }) {
         const nextSalaoId = (first?.salao_id ?? null) as string | null;
 
         let nextFuncionarioId: string | null = null;
-        if (nextRole === "profissional") {
+        let nextFuncionarioAtivo: boolean | null = null;
+
+        // Para qualquer role operacional, se houver vínculo em funcionarios,
+        // carregamos ativo para controlar acesso a rotas sensíveis.
+        if (nextRole && nextRole !== "customer") {
           const { data: f, error: fErr } = await sb
             .from("funcionarios")
-            .select("id")
+            .select("id,ativo")
             .eq("auth_user_id", user.id)
             .maybeSingle();
           if (fErr) throw fErr;
+
           nextFuncionarioId = (f?.id ?? null) as string | null;
+          nextFuncionarioAtivo = typeof f?.ativo === "boolean" ? Boolean(f.ativo) : null;
         }
 
         if (!cancelled) {
           setRole(nextRole);
           setSalaoId(nextSalaoId);
           setFuncionarioId(nextFuncionarioId);
+          setFuncionarioAtivo(nextFuncionarioAtivo);
           setLoading(false);
         }
       } catch {
@@ -73,6 +84,7 @@ export function AccessProvider({ children }: { children: React.ReactNode }) {
           setRole(null);
           setSalaoId(null);
           setFuncionarioId(null);
+          setFuncionarioAtivo(null);
           setLoading(false);
         }
       }
@@ -84,9 +96,27 @@ export function AccessProvider({ children }: { children: React.ReactNode }) {
     };
   }, [user, authLoading]);
 
+  const canManageFuncionarios = useMemo(() => {
+    if (!role) return false;
+    if (!["admin", "staff", "gerente"].includes(role)) return false;
+
+    // Se não está vinculado a um registro em funcionarios (caso dono antigo), mantém acesso.
+    if (!funcionarioId) return true;
+
+    // Se está vinculado, só mantém acesso quando ativo.
+    return funcionarioAtivo === true;
+  }, [role, funcionarioId, funcionarioAtivo]);
+
   const value = useMemo<AccessContextValue>(
-    () => ({ role, salaoId, funcionarioId, loading: loading || authLoading }),
-    [role, salaoId, funcionarioId, loading, authLoading]
+    () => ({
+      role,
+      salaoId,
+      funcionarioId,
+      funcionarioAtivo,
+      canManageFuncionarios,
+      loading: loading || authLoading,
+    }),
+    [role, salaoId, funcionarioId, funcionarioAtivo, canManageFuncionarios, loading, authLoading],
   );
 
   return <AccessContext.Provider value={value}>{children}</AccessContext.Provider>;
