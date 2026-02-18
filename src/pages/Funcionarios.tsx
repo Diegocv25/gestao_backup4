@@ -109,6 +109,8 @@ export default function FuncionariosPage() {
                   <TableHead>Telefone</TableHead>
                   <TableHead>Salário</TableHead>
                   <TableHead>Comissão</TableHead>
+                  <TableHead>Data admissão</TableHead>
+                  <TableHead>Data inatividade</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
@@ -124,6 +126,8 @@ export default function FuncionariosPage() {
                       <TableCell>{f.telefone ?? "—"}</TableCell>
                       <TableCell>{salario > 0 ? `R$ ${salario.toFixed(2)}` : "—"}</TableCell>
                       <TableCell>{comissaoPercentual > 0 ? `${comissaoPercentual.toFixed(0)}%` : "—"}</TableCell>
+                      <TableCell>{f.data_admissao ?? "—"}</TableCell>
+                      <TableCell>{f.data_inatividade ?? "—"}</TableCell>
                       <TableCell>{f.ativo ? "Ativo" : "Inativo"}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
@@ -170,7 +174,7 @@ export default function FuncionariosPage() {
 
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-sm text-muted-foreground">
+                    <TableCell colSpan={9} className="text-sm text-muted-foreground">
                       Nenhum funcionário encontrado.
                     </TableCell>
                   </TableRow>
