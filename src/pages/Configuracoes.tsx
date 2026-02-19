@@ -47,6 +47,30 @@ const KIWIFY_CHECKOUTS = {
   pro_ia: "https://pay.kiwify.com.br/Bru2N8Q",
 } as const;
 
+function onlyDigits(v: string) {
+  return String(v ?? "").replace(/\D/g, "");
+}
+
+function jidToLocalPhone(v?: string | null) {
+  if (!v) return "";
+  let s = String(v).trim().replace(/@s\.whatsapp\.net$/i, "");
+  s = onlyDigits(s);
+  if (s.startsWith("55")) s = s.slice(2);
+  // Se veio sem 9 (DD + 8), exibe com 9 para o usuário preencher no padrão local
+  if (s.length === 10) s = `${s.slice(0, 2)}9${s.slice(2)}`;
+  return s;
+}
+
+function localPhoneToJid(v?: string | null) {
+  if (!v) return null;
+  let s = onlyDigits(v);
+  if (s.startsWith("55")) s = s.slice(2);
+  // WhatsApp/Evolution costuma usar sem o 9 adicional (DD + 8)
+  if (s.length === 11 && s[2] === "9") s = `${s.slice(0, 2)}${s.slice(3)}`;
+  if (s.length !== 10) return null;
+  return `55${s}@s.whatsapp.net`;
+}
+
 function defaultDia(salaoId: string, dia: number): DiaFuncionamentoForm {
   const fechado = dia === 0;
   return {
@@ -124,7 +148,7 @@ export default function ConfiguracoesPage() {
       id: salaoQuery.data.id,
       nome: salaoQuery.data.nome ?? "",
       logo_url: (salaoQuery.data as any).logo_url ?? null,
-      telefone: salaoQuery.data.telefone ?? "",
+      telefone: jidToLocalPhone(salaoQuery.data.telefone),
       endereco: salaoQuery.data.endereco ?? "",
       agendamento_antecedencia_modo: (salaoQuery.data.agendamento_antecedencia_modo as any) ?? "horas",
       agendamento_antecedencia_horas: Number(salaoQuery.data.agendamento_antecedencia_horas ?? 0),
@@ -262,13 +286,17 @@ export default function ConfiguracoesPage() {
   const saveMutation = useMutation({
     mutationFn: async (payload: { salao: SalaoForm; dias: DiaFuncionamentoForm[] }) => {
       if (!payload.salao.nome.trim()) throw new Error("Informe o nome do salão");
+      const telefoneJid = localPhoneToJid(payload.salao.telefone);
+      if (String(payload.salao.telefone ?? "").trim() && !telefoneJid) {
+        throw new Error("Telefone inválido. Use o formato (DD) 999999999");
+      }
 
         const { data: saved, error } = await supabase
           .from("saloes")
           .upsert({
             id: payload.salao.id,
             nome: payload.salao.nome.trim(),
-            telefone: payload.salao.telefone?.trim() || null,
+            telefone: telefoneJid || null,
             endereco: payload.salao.endereco?.trim() || null,
             agendamento_antecedencia_modo: payload.salao.agendamento_antecedencia_modo,
             agendamento_antecedencia_horas: Math.max(0, Number(payload.salao.agendamento_antecedencia_horas ?? 0)),
@@ -501,8 +529,22 @@ export default function ConfiguracoesPage() {
                   <Input id="nome" value={form.nome} onChange={(e) => setForm((p) => ({ ...p, nome: e.target.value }))} />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="tel">Telefone (No plano PRO+IA será utilizada no atendente do WhatsApp)</Label>
-                  <Input id="tel" value={form.telefone ?? ""} onChange={(e) => setForm((p) => ({ ...p, telefone: e.target.value }))} />
+                  <Label htmlFor="tel">WhatsApp da instância (salvo como 55XXXXXXXXXX@s.whatsapp.net)</Label>
+                  <div className="flex items-center rounded-md border bg-background">
+                    <span className="px-3 text-sm text-muted-foreground border-r">55</span>
+                    <Input
+                      id="tel"
+                      className="border-0 focus-visible:ring-0"
+                      placeholder="(DD) 999999999"
+                      value={form.telefone ?? ""}
+                      onChange={(e) =>
+                        setForm((p) => ({
+                          ...p,
+                          telefone: onlyDigits(e.target.value).slice(0, 11),
+                        }))
+                      }
+                    />
+                  </div>
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="end">Endereço</Label>
