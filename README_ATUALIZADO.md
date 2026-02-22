@@ -805,6 +805,10 @@ Isso é implementado em `src/portal/portal-api.ts` e as Edge Functions priorizam
  
  ### Via Vercel (Recomendado)
  
+- Deploy via Vercel (GitHub) é o fluxo padrão.
+- Ajustes dependentes de domínio (URLs canônicas, e-mail, redirects) devem ser aplicados quando o domínio estiver definido.
+- Documentação de comportamento (fonte de verdade): `/root/.openclaw/workspace/docs/behavior/gestao_backup4/`
+ 
  ```bash
  # Build do projeto
  npm run build
