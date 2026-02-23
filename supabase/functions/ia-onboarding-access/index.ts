@@ -86,19 +86,40 @@ serve(async (req) => {
     return json({ ok: false, error: "plan_not_allowed" }, { status: 403 }, corsHeaders);
   }
 
-  const token = crypto.randomUUID();
-  const expiresAt = new Date(Date.now() + 1000 * 60 * 30).toISOString(); // 30 min
+  // Reutiliza token ainda válido para evitar recarregar o iframe no meio do preenchimento.
+  // (React Query / eventos de sessão podem re-chamar a edge function.)
+  const nowIso = new Date().toISOString();
+  const { data: existingTokenRow, error: existingTokenErr } = await admin
+    .from("ia_onboarding_tokens")
+    .select("token,expires_at")
+    .eq("user_id", user.id)
+    .eq("salao_id", roleRow.salao_id)
+    .is("used_at", null)
+    .gt("expires_at", nowIso)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  const { error: tokenErr } = await admin.from("ia_onboarding_tokens").insert({
-    token,
-    user_id: user.id,
-    salao_id: roleRow.salao_id,
-    email,
-    expires_at: expiresAt,
-  });
+  if (existingTokenErr) {
+    return json({ ok: false, error: existingTokenErr.message }, { status: 500 }, corsHeaders);
+  }
 
-  if (tokenErr) {
-    return json({ ok: false, error: tokenErr.message }, { status: 500 }, corsHeaders);
+  const token = existingTokenRow?.token ?? crypto.randomUUID();
+  // Aumenta a janela: o formulário diz 30–45 min, então 2h dá folga.
+  const expiresAt = existingTokenRow?.expires_at ?? new Date(Date.now() + 1000 * 60 * 60 * 2).toISOString(); // 2h
+
+  if (!existingTokenRow) {
+    const { error: tokenErr } = await admin.from("ia_onboarding_tokens").insert({
+      token,
+      user_id: user.id,
+      salao_id: roleRow.salao_id,
+      email,
+      expires_at: expiresAt,
+    });
+
+    if (tokenErr) {
+      return json({ ok: false, error: tokenErr.message }, { status: 500 }, corsHeaders);
+    }
   }
 
   const formUrl = `${n8nFormUrl}?onboarding_token=${encodeURIComponent(token)}&salao_id=${encodeURIComponent(roleRow.salao_id)}`;

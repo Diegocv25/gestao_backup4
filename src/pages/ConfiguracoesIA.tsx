@@ -21,6 +21,11 @@ export default function ConfiguracoesIAPage() {
       return (data ?? {}) as AccessResponse;
     },
     retry: false,
+    // Evita refetch/reload do iframe enquanto o usuário preenche (o formulário leva ~30-45min)
+    staleTime: 1000 * 60 * 60, // 1h
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
   });
 
   if (!accessQuery.isLoading && (!accessQuery.data?.ok || !accessQuery.data?.form_url)) {
