@@ -31,6 +31,7 @@
    total_venda: number;
    total_custo: number;
    lucro_bruto: number;
+   comissao_funcionario: number;
    cliente_nome: string | null;
    forma_pagamento: string | null;
    created_at: string;
@@ -81,6 +82,7 @@
            total_venda,
            total_custo,
            lucro_bruto,
+           comissao_funcionario,
            cliente_nome,
            forma_pagamento,
            created_at,
@@ -103,7 +105,8 @@
    const vendas = vendasQuery.data || [];
  
    const totalVendas = vendas.reduce((acc, v) => acc + Number(v.total_venda), 0);
-   const totalLucro = vendas.reduce((acc, v) => acc + Number(v.lucro_bruto), 0);
+   const totalComissoesProdutos = vendas.reduce((acc, v) => acc + Number(v.comissao_funcionario ?? 0), 0);
+   const totalLucro = vendas.reduce((acc, v) => acc + (Number(v.lucro_bruto) - Number(v.comissao_funcionario ?? 0)), 0);
  
    function getTipoBadge(tipo: string) {
      const tipos: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> = {
@@ -170,7 +173,7 @@
          <CardHeader>
            <CardTitle>Vendas de Produtos</CardTitle>
            <CardDescription>
-             Registro de vendas realizadas • Total: R$ {totalVendas.toFixed(2)} • Lucro: R$ {totalLucro.toFixed(2)}
+             Registro de vendas realizadas • Total: R$ {totalVendas.toFixed(2)} • Comissão funcionários: R$ {totalComissoesProdutos.toFixed(2)} • Lucro líquido: R$ {totalLucro.toFixed(2)}
            </CardDescription>
          </CardHeader>
          <CardContent>
@@ -192,7 +195,8 @@
                      <TableHead>Quantidade</TableHead>
                      <TableHead>Preço Unit.</TableHead>
                      <TableHead>Total Venda</TableHead>
-                     <TableHead>Lucro</TableHead>
+                     <TableHead>Comissão func.</TableHead>
+                     <TableHead>Lucro líquido</TableHead>
                      <TableHead>Cliente</TableHead>
                      <TableHead>Funcionário</TableHead>
                      <TableHead>Pagamento</TableHead>
@@ -210,8 +214,11 @@
                        </TableCell>
                        <TableCell>R$ {Number(venda.preco_unitario).toFixed(2)}</TableCell>
                        <TableCell className="font-medium">R$ {Number(venda.total_venda).toFixed(2)}</TableCell>
+                       <TableCell className="font-medium text-amber-600">
+                         R$ {Number(venda.comissao_funcionario ?? 0).toFixed(2)}
+                       </TableCell>
                        <TableCell className="font-medium text-primary">
-                         R$ {Number(venda.lucro_bruto).toFixed(2)}
+                         R$ {(Number(venda.lucro_bruto) - Number(venda.comissao_funcionario ?? 0)).toFixed(2)}
                        </TableCell>
                        <TableCell>{venda.cliente_nome || "-"}</TableCell>
                        <TableCell>{venda.funcionario.nome}</TableCell>

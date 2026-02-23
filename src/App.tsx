@@ -12,6 +12,7 @@ import { AccessProvider } from "@/auth/access-context";
 import { RoleGate } from "@/auth/RoleGate";
 import { PortalGate } from "@/auth/PortalGate";
 import { BackofficeGate } from "@/auth/BackofficeGate";
+import { FuncionariosRouteGate } from "@/auth/FuncionariosRouteGate";
 
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -24,6 +25,7 @@ import FuncionariosPage from "./pages/Funcionarios";
 import RelatoriosPage from "./pages/Relatorios";
 import ProdutosPage from "./pages/Produtos";
 import ConfiguracoesPage from "./pages/Configuracoes";
+import ConfiguracoesIAPage from "./pages/ConfiguracoesIA";
 import ClientePublicoPage from "./pages/ClientePublico";
 import ClientePortalAppPage from "./pages/ClientePortalApp";
 import ClientePortalMeusAgendamentosPage from "./pages/ClientePortalMeusAgendamentos";
@@ -87,6 +89,12 @@ const App = () => (
 
                   {/* Configurações (onboarding): acessível para usuário logado mesmo sem role */}
                   <Route path="/configuracoes" element={<ConfiguracoesPage />} />
+                  <Route path="/configuracoes/ia" element={<ConfiguracoesIAPage />} />
+
+                  {/* Produtos (também disponível para profissional) */}
+                  <Route element={<RoleGate allowed={["admin", "staff", "gerente", "recepcionista", "profissional"]} />}>
+                    <Route path="/produtos" element={<ProdutosPage />} />
+                  </Route>
 
                   {/* Admin/Gerente/Recepcionista/Staff */}
                   <Route element={<RoleGate allowed={["admin", "staff", "gerente", "recepcionista"]} />}>
@@ -103,11 +111,11 @@ const App = () => (
                     <Route path="/servicos/novo" element={<ServicoFormPage />} />
                     <Route path="/servicos/:id" element={<ServicoFormPage />} />
 
-                    <Route path="/funcionarios" element={<FuncionariosPage />} />
-                    <Route path="/funcionarios/novo" element={<FuncionarioFormPage />} />
-                    <Route path="/funcionarios/:id" element={<FuncionarioFormPage />} />
-
-                    <Route path="/produtos" element={<ProdutosPage />} />
+                    <Route element={<FuncionariosRouteGate />}>
+                      <Route path="/funcionarios" element={<FuncionariosPage />} />
+                      <Route path="/funcionarios/novo" element={<FuncionarioFormPage />} />
+                      <Route path="/funcionarios/:id" element={<FuncionarioFormPage />} />
+                    </Route>
 
                     <Route path="/relatorios" element={<RelatoriosPage />} />
                   </Route>

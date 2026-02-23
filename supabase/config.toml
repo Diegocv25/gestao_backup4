@@ -51,3 +51,12 @@ verify_jwt = false
 
 [functions.portal-agendamento-update]
 verify_jwt = false
+
+[functions.kiwify-webhook]
+verify_jwt = false
+
+[functions.ia-onboarding-access]
+verify_jwt = false
+
+[functions.ia-onboarding-submit]
+verify_jwt = false

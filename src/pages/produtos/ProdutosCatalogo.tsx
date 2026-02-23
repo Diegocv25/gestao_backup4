@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
    custo_medio: number;
    estoque_atual: number;
    estoque_minimo: number;
+   comissao_valor_fixo: number;
    ativo: boolean;
  }
  
@@ -67,6 +68,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
           custo_medio: produto.custo_medio as number,
           estoque_atual: produto.estoque_atual as number,
           estoque_minimo: produto.estoque_minimo as number,
+          comissao_valor_fixo: produto.comissao_valor_fixo as number,
           ativo: produto.ativo ?? true,
         };
         const { error } = await supabase.from("produtos").insert([insertData]);
@@ -95,6 +97,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
        custo_medio: Number(formData.get("custo_medio")),
       estoque_atual: Number(formData.get("estoque_atual")),
        estoque_minimo: Number(formData.get("estoque_minimo")),
+       comissao_valor_fixo: Number(formData.get("comissao_valor_fixo") ?? 0),
        ativo: formData.get("ativo") === "on",
      });
    }
@@ -166,6 +169,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
                    <Input id="custo_medio" name="custo_medio" type="number" step="0.01" min="0" defaultValue={editingProduto?.custo_medio || 0} required />
                  </div>
                  <div className="space-y-2">
+                   <Label htmlFor="comissao_valor_fixo">Comissão fixa por venda (R$)</Label>
+                   <Input
+                     id="comissao_valor_fixo"
+                     name="comissao_valor_fixo"
+                     type="number"
+                     step="0.01"
+                     min="0"
+                     defaultValue={editingProduto?.comissao_valor_fixo || 0}
+                   />
+                 </div>
+                 <div className="space-y-2">
                   <Label htmlFor="estoque_atual">Estoque atual *</Label>
                   <Input id="estoque_atual" name="estoque_atual" type="number" step="0.01" min="0" defaultValue={editingProduto?.estoque_atual || 0} required />
                 </div>
@@ -198,6 +212,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
                  <TableHead>Unidade</TableHead>
                  <TableHead className="text-right">Preço venda</TableHead>
                  <TableHead className="text-right">Custo médio</TableHead>
+                 <TableHead className="text-right">Comissão fixa</TableHead>
                  <TableHead className="text-right">Estoque atual</TableHead>
                  <TableHead className="text-right">Estoque mín.</TableHead>
                  <TableHead>Status</TableHead>
@@ -212,6 +227,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
                    <TableCell>{p.unidade}</TableCell>
                    <TableCell className="text-right">{formatBRL(p.preco_venda)}</TableCell>
                    <TableCell className="text-right">{formatBRL(p.custo_medio)}</TableCell>
+                   <TableCell className="text-right">{formatBRL(p.comissao_valor_fixo ?? 0)}</TableCell>
                    <TableCell className="text-right">
                      <span className={p.estoque_atual <= p.estoque_minimo ? "text-destructive font-semibold" : ""}>
                        {p.estoque_atual}
@@ -232,7 +248,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
                ))}
                {produtosQuery.data.length === 0 && (
                  <TableRow>
-                   <TableCell colSpan={9} className="text-center text-sm text-muted-foreground">
+                   <TableCell colSpan={10} className="text-center text-sm text-muted-foreground">
                      Nenhum produto cadastrado
                    </TableCell>
                  </TableRow>

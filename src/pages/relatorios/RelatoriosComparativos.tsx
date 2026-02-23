@@ -90,6 +90,8 @@ export default function RelatoriosComparativos({
         comCalcPrev,
         comPagasAtual,
         comPagasPrev,
+        comissaoProdutosAtual,
+        comissaoProdutosPrev,
       ] = await Promise.all([
         supabase
           .from("agendamentos")
@@ -150,9 +152,23 @@ export default function RelatoriosComparativos({
           .not("pago_em", "is", null)
           .gte("pago_em", prev.prevInicio.toISOString())
           .lt("pago_em", prev.prevFimExclusivo.toISOString()),
+
+        supabase
+          .from("vendas_produtos")
+          .select("comissao_funcionario")
+          .eq("salao_id", salaoId as string)
+          .gte("created_at", inicioDate.toISOString())
+          .lt("created_at", fimDateExclusivo.toISOString()),
+
+        supabase
+          .from("vendas_produtos")
+          .select("comissao_funcionario")
+          .eq("salao_id", salaoId as string)
+          .gte("created_at", prev.prevInicio.toISOString())
+          .lt("created_at", prev.prevFimExclusivo.toISOString()),
       ]);
 
-      const errors = [agAtual.error, agPrev.error, vendasProdutosAtual.error, vendasProdutosPrev.error, comCalcAtual.error, comCalcPrev.error, comPagasAtual.error, comPagasPrev.error].filter(
+      const errors = [agAtual.error, agPrev.error, vendasProdutosAtual.error, vendasProdutosPrev.error, comCalcAtual.error, comCalcPrev.error, comPagasAtual.error, comPagasPrev.error, comissaoProdutosAtual.error, comissaoProdutosPrev.error].filter(
         Boolean,
       );
       if (errors.length) throw errors[0];
@@ -167,9 +183,11 @@ export default function RelatoriosComparativos({
 
       const comissoesCalcAtual = (comCalcAtual.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.valor_calculado), 0);
       const comissoesCalcPrev = (comCalcPrev.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.valor_calculado), 0);
+      const comissaoProdutosAtualSum = (comissaoProdutosAtual.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.comissao_funcionario), 0);
+      const comissaoProdutosPrevSum = (comissaoProdutosPrev.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.comissao_funcionario), 0);
 
-      const receitaLiquidaAtual = receitaBrutaAtual - comissoesCalcAtual;
-      const receitaLiquidaPrev = receitaBrutaPrev - comissoesCalcPrev;
+      const receitaLiquidaAtual = receitaBrutaAtual - comissoesCalcAtual - comissaoProdutosAtualSum;
+      const receitaLiquidaPrev = receitaBrutaPrev - comissoesCalcPrev - comissaoProdutosPrevSum;
 
       const comissoesPagasAtualSum = (comPagasAtual.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.valor_calculado), 0);
       const comissoesPagasPrevSum = (comPagasPrev.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.valor_calculado), 0);

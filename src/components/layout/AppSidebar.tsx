@@ -49,10 +49,12 @@ const allItems = {
     { title: "Agendamentos", url: "/agendamentos", icon: CalendarDays, end: true },
     { title: "Clientes", url: "/clientes", icon: Users },
     { title: "Serviços", url: "/servicos", icon: Scissors },
+    { title: "Produtos", url: "/produtos", icon: Package },
   ],
   profissional: [
     { title: "Meus agendamentos", url: "/profissional/agendamentos", icon: CalendarDays, end: true },
     { title: "Minhas comissões", url: "/profissional/comissoes", icon: Wallet },
+    { title: "Produtos", url: "/produtos", icon: Package },
   ],
   staff: [
     { title: "Dashboard", url: "/", icon: LayoutDashboard, end: true },
@@ -74,12 +76,14 @@ export function AppSidebar() {
   const isCollapsed = state === "collapsed" && !isMobile;
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { role, salaoId } = useAccess();
+  const { role, salaoId, canManageFuncionarios } = useAccess();
 
   const items = useMemo(() => {
     if (!role) return [];
-    return (allItems as any)[role] ?? [];
-  }, [role]);
+    const base = ((allItems as any)[role] ?? []) as Array<{ title: string; url: string; icon: any; end?: boolean }>;
+    if (canManageFuncionarios) return base;
+    return base.filter((i) => i.url !== "/funcionarios");
+  }, [role, canManageFuncionarios]);
 
   const salaoQuery = useQuery({
     queryKey: ["salao", salaoId],

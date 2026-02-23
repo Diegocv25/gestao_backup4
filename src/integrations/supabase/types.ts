@@ -416,6 +416,8 @@ export type Database = {
           comissao_tipo: Database["public"]["Enums"]["comissao_tipo"]
           comissao_valor_fixo: number | null
           created_at: string
+          data_admissao: string | null
+          data_inatividade: string | null
           email: string | null
           id: string
           nome: string
@@ -433,6 +435,8 @@ export type Database = {
           comissao_tipo?: Database["public"]["Enums"]["comissao_tipo"]
           comissao_valor_fixo?: number | null
           created_at?: string
+          data_admissao?: string | null
+          data_inatividade?: string | null
           email?: string | null
           id?: string
           nome: string
@@ -450,6 +454,8 @@ export type Database = {
           comissao_tipo?: Database["public"]["Enums"]["comissao_tipo"]
           comissao_valor_fixo?: number | null
           created_at?: string
+          data_admissao?: string | null
+          data_inatividade?: string | null
           email?: string | null
           id?: string
           nome?: string
@@ -733,6 +739,7 @@ export type Database = {
           ativo: boolean
           categoria: string | null
           created_at: string
+          comissao_valor_fixo: number
           custo_medio: number
           estoque_atual: number
           estoque_minimo: number
@@ -747,6 +754,7 @@ export type Database = {
           ativo?: boolean
           categoria?: string | null
           created_at?: string
+          comissao_valor_fixo?: number
           custo_medio?: number
           estoque_atual?: number
           estoque_minimo?: number
@@ -761,6 +769,7 @@ export type Database = {
           ativo?: boolean
           categoria?: string | null
           created_at?: string
+          comissao_valor_fixo?: number
           custo_medio?: number
           estoque_atual?: number
           estoque_minimo?: number
@@ -972,6 +981,7 @@ export type Database = {
       vendas_produtos: {
         Row: {
           cliente_nome: string | null
+          comissao_funcionario: number
           created_at: string
           custo_unitario: number
           forma_pagamento: string | null
@@ -987,6 +997,7 @@ export type Database = {
         }
         Insert: {
           cliente_nome?: string | null
+          comissao_funcionario?: number
           created_at?: string
           custo_unitario: number
           forma_pagamento?: string | null
@@ -1002,6 +1013,7 @@ export type Database = {
         }
         Update: {
           cliente_nome?: string | null
+          comissao_funcionario?: number
           created_at?: string
           custo_unitario?: number
           forma_pagamento?: string | null

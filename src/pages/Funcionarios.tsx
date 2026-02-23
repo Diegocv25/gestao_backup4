@@ -20,16 +20,21 @@ export default function FuncionariosPage() {
   const { role } = useAccess();
 
   const [q, setQ] = useState("");
+  const [showInativos, setShowInativos] = useState(false);
 
   const funcionariosQuery = useQuery({
-    queryKey: ["funcionarios"],
+    queryKey: ["funcionarios", showInativos],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("funcionarios")
         .select(
-          "id,nome,carga,telefone,email,ativo,auth_user_id,recebe_salario_fixo,salario_fixo_mensal,comissao_tipo,comissao_percentual,comissao_valor_fixo",
+          "id,nome,carga,telefone,email,ativo,auth_user_id,recebe_salario_fixo,salario_fixo_mensal,comissao_tipo,comissao_percentual,comissao_valor_fixo,data_admissao,data_inatividade",
         )
         .order("nome");
+
+      query = showInativos ? query.eq("ativo", false) : query.eq("ativo", true);
+
+      const { data, error } = await query;
       if (error) throw error;
       return data ?? [];
     },
@@ -43,10 +48,13 @@ export default function FuncionariosPage() {
     );
   }, [funcionariosQuery.data, q]);
 
-  const deleteMutation = useMutation({
+  const inativarMutation = useMutation({
     mutationFn: async (id: string) => {
-      await supabase.from("horarios_funcionario").delete().eq("funcionario_id", id);
-      const { error } = await supabase.from("funcionarios").delete().eq("id", id);
+      const hoje = new Date().toISOString().slice(0, 10);
+      const { error } = await supabase
+        .from("funcionarios")
+        .update({ ativo: false, data_inatividade: hoje })
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: async () => {
@@ -54,7 +62,7 @@ export default function FuncionariosPage() {
         qc.invalidateQueries({ queryKey: ["funcionarios"] }),
         qc.invalidateQueries({ queryKey: ["horarios_funcionario"] }),
       ]);
-      toast({ title: "Funcionário removido" });
+      toast({ title: "Funcionário inativado" });
     },
     onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
@@ -66,6 +74,9 @@ export default function FuncionariosPage() {
       actions={
         <>
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar funcionário…" />
+          <Button variant={showInativos ? "default" : "secondary"} onClick={() => setShowInativos((v) => !v)}>
+            {showInativos ? "Ver ativos" : "Funcionários inativos"}
+          </Button>
           <Button onClick={() => nav("/funcionarios/novo")}>Novo funcionário</Button>
         </>
       }
@@ -98,6 +109,8 @@ export default function FuncionariosPage() {
                   <TableHead>Telefone</TableHead>
                   <TableHead>Salário</TableHead>
                   <TableHead>Comissão</TableHead>
+                  <TableHead>Data admissão</TableHead>
+                  {showInativos ? <TableHead>Data inatividade</TableHead> : null}
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
@@ -113,6 +126,8 @@ export default function FuncionariosPage() {
                       <TableCell>{f.telefone ?? "—"}</TableCell>
                       <TableCell>{salario > 0 ? `R$ ${salario.toFixed(2)}` : "—"}</TableCell>
                       <TableCell>{comissaoPercentual > 0 ? `${comissaoPercentual.toFixed(0)}%` : "—"}</TableCell>
+                      <TableCell>{f.data_admissao ?? "—"}</TableCell>
+                      {showInativos ? <TableCell>{f.data_inatividade ?? "—"}</TableCell> : null}
                       <TableCell>{f.ativo ? "Ativo" : "Inativo"}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
@@ -141,14 +156,16 @@ export default function FuncionariosPage() {
                           <Button variant="secondary" size="sm" onClick={() => nav(`/funcionarios/${f.id}`)}>
                             Editar
                           </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => deleteMutation.mutate(f.id)}
-                            disabled={deleteMutation.isPending}
-                          >
-                            Excluir
-                          </Button>
+                          {!showInativos ? (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => inativarMutation.mutate(f.id)}
+                              disabled={inativarMutation.isPending}
+                            >
+                              Inativar
+                            </Button>
+                          ) : null}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -157,7 +174,7 @@ export default function FuncionariosPage() {
 
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-sm text-muted-foreground">
+                    <TableCell colSpan={showInativos ? 9 : 8} className="text-sm text-muted-foreground">
                       Nenhum funcionário encontrado.
                     </TableCell>
                   </TableRow>

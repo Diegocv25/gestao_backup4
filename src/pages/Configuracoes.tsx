@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import { Paperclip } from "lucide-react";
+import { Bot, MessageCircle, Paperclip } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/auth/auth-context";
 import { useAccess } from "@/auth/access-context";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,35 @@ type DiaFuncionamentoForm = {
 };
 
 const diasLabel = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const SUPPORT_WHATSAPP_URL = "https://wa.me/5548991015688";
+const KIWIFY_CHECKOUTS = {
+  profissional: "https://pay.kiwify.com.br/H5429N1",
+  pro_ia: "https://pay.kiwify.com.br/Bru2N8Q",
+} as const;
+
+function onlyDigits(v: string) {
+  return String(v ?? "").replace(/\D/g, "");
+}
+
+function jidToLocalPhone(v?: string | null) {
+  if (!v) return "";
+  let s = String(v).trim().replace(/@s\.whatsapp\.net$/i, "");
+  s = onlyDigits(s);
+  if (s.startsWith("55")) s = s.slice(2);
+  // Se veio sem 9 (DD + 8), exibe com 9 para o usuário preencher no padrão local
+  if (s.length === 10) s = `${s.slice(0, 2)}9${s.slice(2)}`;
+  return s;
+}
+
+function localPhoneToJid(v?: string | null) {
+  if (!v) return null;
+  let s = onlyDigits(v);
+  if (s.startsWith("55")) s = s.slice(2);
+  // WhatsApp/Evolution costuma usar sem o 9 adicional (DD + 8)
+  if (s.length === 11 && s[2] === "9") s = `${s.slice(0, 2)}${s.slice(3)}`;
+  if (s.length !== 10) return null;
+  return `55${s}@s.whatsapp.net`;
+}
 
 function defaultDia(salaoId: string, dia: number): DiaFuncionamentoForm {
   const fechado = dia === 0;
@@ -72,6 +102,24 @@ export default function ConfiguracoesPage() {
     },
   });
 
+  const subscriptionQuery = useQuery({
+    queryKey: ["subscription-current", user?.email],
+    enabled: !!user?.email,
+    queryFn: async () => {
+      const client = supabase as any;
+      const { data, error } = await client
+        .from("subscriptions")
+        .select("status,product_id,product_name,updated_at")
+        .eq("provider", "kiwify")
+        .eq("customer_email", String(user?.email ?? "").toLowerCase())
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data ?? null;
+    },
+  });
+
   const salaoQuery = useQuery({
     queryKey: ["salao"],
     queryFn: async () => {
@@ -100,7 +148,7 @@ export default function ConfiguracoesPage() {
       id: salaoQuery.data.id,
       nome: salaoQuery.data.nome ?? "",
       logo_url: (salaoQuery.data as any).logo_url ?? null,
-      telefone: salaoQuery.data.telefone ?? "",
+      telefone: jidToLocalPhone(salaoQuery.data.telefone),
       endereco: salaoQuery.data.endereco ?? "",
       agendamento_antecedencia_modo: (salaoQuery.data.agendamento_antecedencia_modo as any) ?? "horas",
       agendamento_antecedencia_horas: Number(salaoQuery.data.agendamento_antecedencia_horas ?? 0),
@@ -238,13 +286,17 @@ export default function ConfiguracoesPage() {
   const saveMutation = useMutation({
     mutationFn: async (payload: { salao: SalaoForm; dias: DiaFuncionamentoForm[] }) => {
       if (!payload.salao.nome.trim()) throw new Error("Informe o nome do salão");
+      const telefoneJid = localPhoneToJid(payload.salao.telefone);
+      if (String(payload.salao.telefone ?? "").trim() && !telefoneJid) {
+        throw new Error("Telefone inválido. Use o formato (DD) 999999999");
+      }
 
         const { data: saved, error } = await supabase
           .from("saloes")
           .upsert({
             id: payload.salao.id,
             nome: payload.salao.nome.trim(),
-            telefone: payload.salao.telefone?.trim() || null,
+            telefone: telefoneJid || null,
             endereco: payload.salao.endereco?.trim() || null,
             agendamento_antecedencia_modo: payload.salao.agendamento_antecedencia_modo,
             agendamento_antecedencia_horas: Math.max(0, Number(payload.salao.agendamento_antecedencia_horas ?? 0)),
@@ -290,6 +342,19 @@ export default function ConfiguracoesPage() {
   const isStaffNonAdmin = role !== null && role !== "admin";
 
   const canEditDias = !!salaoQuery.data?.id;
+
+  const currentPlanId = useMemo<"profissional" | "pro_ia">(() => {
+    const s = subscriptionQuery.data as any;
+    const pid = String(s?.product_id ?? "").toLowerCase();
+    const pname = String(s?.product_name ?? "").toLowerCase();
+    if (pid.includes("pro_ia") || pname.includes("pro") || pname.includes("ia")) return "pro_ia";
+    return "profissional";
+  }, [subscriptionQuery.data]);
+
+  const checkoutCurrentPlan = KIWIFY_CHECKOUTS[currentPlanId];
+  const checkoutUpgradePlan = currentPlanId === "profissional" ? KIWIFY_CHECKOUTS.pro_ia : KIWIFY_CHECKOUTS.profissional;
+  const currentPlanLabel = currentPlanId === "pro_ia" ? "PRO + IA" : "Profissional";
+  const upgradeLabel = currentPlanId === "profissional" ? "Upgrade para PRO + IA" : "Trocar para Profissional";
 
   const changePasswordSchema = useMemo(
     () =>
@@ -464,8 +529,23 @@ export default function ConfiguracoesPage() {
                   <Input id="nome" value={form.nome} onChange={(e) => setForm((p) => ({ ...p, nome: e.target.value }))} />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="tel">Telefone (No plano PRO+IA será utilizada no atendente do WhatsApp)</Label>
-                  <Input id="tel" value={form.telefone ?? ""} onChange={(e) => setForm((p) => ({ ...p, telefone: e.target.value }))} />
+                  <Label htmlFor="tel">WhatsApp da instância (salvo como 55XXXXXXXXXX@s.whatsapp.net)</Label>
+                  <div className="flex items-center rounded-md border bg-background">
+                    <span className="border-r px-3 text-sm text-muted-foreground">55</span>
+                    <Input
+                      id="tel"
+                      className="border-0 focus-visible:ring-0"
+                      placeholder="(DD) 999999999"
+                      value={form.telefone ?? ""}
+                      onChange={(e) =>
+                        setForm((p) => ({
+                          ...p,
+                          // No plano PRO+IA este número é utilizado pela instância do WhatsApp (secretária virtual)
+                          telefone: onlyDigits(e.target.value).slice(0, 11),
+                        }))
+                      }
+                    />
+                  </div>
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="end">Endereço</Label>
@@ -633,6 +713,65 @@ export default function ConfiguracoesPage() {
           </Card>
 
           <AvisosSemanaisCard salaoId={salaoQuery.data?.id} />
+        </>
+      ) : null}
+
+      {!isStaffNonAdmin ? (
+        <>
+          <Card>
+            <CardContent className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-medium">Configuração da IA</p>
+                <p className="text-xs text-muted-foreground">
+                  {currentPlanId === "pro_ia"
+                    ? "Seu plano atual inclui onboarding da IA no próprio sistema."
+                    : "Disponível apenas no plano PRO + IA."}
+                </p>
+              </div>
+              <Button asChild size="sm" disabled={currentPlanId !== "pro_ia"}>
+                <Link to="/configuracoes/ia" aria-label="Abrir configuração da IA">
+                  <Bot className="h-4 w-4" />
+                  Configurar IA
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-medium">Pagamento da assinatura</p>
+                <p className="text-xs text-muted-foreground">Plano atual: {currentPlanLabel}</p>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button asChild size="sm">
+                  <a href={checkoutCurrentPlan} target="_blank" rel="noreferrer" aria-label="Pagar assinatura no checkout">
+                    Pagar plano atual
+                  </a>
+                </Button>
+                <Button asChild variant="outline" size="sm">
+                  <a href={checkoutUpgradePlan} target="_blank" rel="noreferrer" aria-label="Alterar plano no checkout">
+                    {upgradeLabel}
+                  </a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-medium">Suporte Nexus Automações</p>
+                <p className="text-xs text-muted-foreground">WhatsApp: (48) 99101-5688</p>
+              </div>
+              <Button asChild variant="outline" size="sm">
+                <a href={SUPPORT_WHATSAPP_URL} target="_blank" rel="noreferrer" aria-label="Falar com suporte no WhatsApp">
+                  <MessageCircle className="h-4 w-4" />
+                  WhatsApp suporte
+                </a>
+              </Button>
+            </CardContent>
+          </Card>
         </>
       ) : null}
     </FormPageShell>
