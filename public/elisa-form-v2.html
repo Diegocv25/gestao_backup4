@@ -1132,7 +1132,7 @@
 
       try {
         // Envio direto para a Edge Function (Supabase). Ela valida o token e chama o n8n apenas no SUBMIT.
-        const response = await fetch('https://obbdfoijktcftywvwwri.supabase.co/functions/v1/ia-onboarding-submit', {
+        const response = await fetch('https://idampxfbqakcdamqxgqe.supabase.co/functions/v1/ia-onboarding-submit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ onboarding_token, salao_id, ...dados })
