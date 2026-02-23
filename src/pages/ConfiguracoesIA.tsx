@@ -29,7 +29,32 @@ export default function ConfiguracoesIAPage() {
   });
 
   if (!accessQuery.isLoading && (!accessQuery.data?.ok || !accessQuery.data?.form_url)) {
-    return <Navigate to="/configuracoes" replace />;
+    return (
+      <FormPageShell
+        title="Configuração da IA"
+        description="Onboarding da IA com validação de assinatura PRO + IA e tenant do estabelecimento."
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Não foi possível abrir o formulário</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm text-muted-foreground">
+              {accessQuery.data?.error
+                ? `Erro: ${accessQuery.data.error}`
+                : accessQuery.error
+                  ? `Erro: ${String(accessQuery.error)}`
+                  : "Erro desconhecido."}
+            </div>
+            <div className="mt-3 text-sm">
+              <a className="underline" href="/configuracoes">
+                Voltar para Configurações
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+      </FormPageShell>
+    );
   }
 
   return (
