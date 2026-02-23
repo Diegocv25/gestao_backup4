@@ -35,7 +35,9 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const n8nFormUrl = Deno.env.get("N8N_RAG_FORM_URL") || "https://n8nfila-n8n-editor.elzqmm.easypanel.host/webhook/8f1f738c-8eb2-4ae2-8420-03cf583839df";
+  // Formulário agora é servido pelo próprio front (Vercel) para evitar execuções no n8n a cada carregamento do iframe.
+  // O n8n fica apenas no submit (ia-onboarding-submit → n8n ingest).
+  const frontendBaseUrl = Deno.env.get("FRONTEND_BASE_URL") || req.headers.get("origin") || "https://gestaobackup4.vercel.app";
 
   if (!supabaseUrl || !serviceRoleKey) {
     return json({ ok: false, error: "missing_env" }, { status: 500 }, corsHeaders);
@@ -122,7 +124,7 @@ serve(async (req) => {
     }
   }
 
-  const formUrl = `${n8nFormUrl}?onboarding_token=${encodeURIComponent(token)}&salao_id=${encodeURIComponent(roleRow.salao_id)}`;
+  const formUrl = `${frontendBaseUrl.replace(/\/$/, "")}/elisa-form-v2.html?onboarding_token=${encodeURIComponent(token)}&salao_id=${encodeURIComponent(roleRow.salao_id)}`;
 
   return json(
     {

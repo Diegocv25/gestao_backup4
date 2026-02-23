@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Formulário v2.0 - Assistente Virtual ELISA</title>
+  <style>
+    :root {
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --secondary: #8b5cf6;
+      --bg: #f9fafb;
+      --text: #1e293b;
+      --text-light: #64748b;
+      --border: #e2e8f0;
+      --success: #10b981;
+      --error: #ef4444;
+      --warning: #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 20px;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: white;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    }
+    .header {
+      text-align: center;
+      border-bottom: 4px solid var(--primary);
+      padding-bottom: 20px;
+      margin-bottom: 30px;
+    }
+    .header h1 { font-size: 28px; color: var(--primary); margin-bottom: 5px; }
+    .welcome {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 30px;
+    }
+    .block {
+      margin-bottom: 40px;
+      border: 1px solid var(--border);
+      padding: 20px;
+      border-radius: 8px;
+      position: relative;
+    }
+    .block-title {
+      background: #f1f5f9;
+      padding: 10px 15px;
+      margin: -20px -20px 20px -20px;
+      border-radius: 8px 8px 0 0;
+      font-weight: bold;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .block-title span { font-size: 12px; color: var(--text-light); font-weight: normal; }
+    .field { margin-bottom: 15px; }
+    label { display: block; font-weight: 600; margin-bottom: 5px; font-size: 14px; }
+    input[type="text"], input[type="email"], input[type="tel"], input[type="number"], textarea, select {
+      width: 100%;
+      padding: 10px;
+      border: 2px solid var(--border);
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+    input.error, textarea.error, select.error { border-color: var(--error); background-color: #fef2f2; }
+    input.success, textarea.success, select.success { border-color: var(--success); }
+    .error-message { color: var(--error); font-size: 12px; margin-top: 3px; display: none; }
+    .error-message.show { display: block; }
+    .row { display: flex; gap: 15px; flex-wrap: wrap; }
+    .row > div { flex: 1; min-width: 200px; }
+    .card {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      position: relative;
+    }
+    .checkbox-group { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; }
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: #fff;
+      padding: 5px 10px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      font-size: 13px;
+      cursor: pointer;
+    }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 13px; }
+    th, td { border: 1px solid var(--border); padding: 8px; text-align: center; }
+    th { background: #f1f5f9; }
+    .btn-add {
+      background: var(--success);
+      color: white;
+      border: none;
+      padding: 8px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-top: 10px;
+      transition: opacity 0.3s;
+    }
+    .btn-remove {
+      background: var(--error);
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      position: absolute;
+      top: 10px;
+      right: 10px;
+    }
+    .no-print { text-align: center; margin-bottom: 20px; display: flex; gap: 10px; justify-content: center; }
+    .btn-print { background: var(--primary); color: white; padding: 12px 25px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+    .btn-submit {
+      background: var(--success);
+      color: white;
+      padding: 15px 40px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 16px;
+      transition: transform 0.2s, background 0.3s;
+    }
+    .btn-submit:hover { background: #059669; transform: translateY(-2px); }
+    .btn-submit:disabled { background: #9ca3af; cursor: not-allowed; transform: none; }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal.active { display: flex; }
+    .modal-content {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      max-width: 500px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    }
+    .modal-content.success { border-top: 5px solid var(--success); }
+    .modal-content.error { border-top: 5px solid var(--error); }
+    .modal-icon { font-size: 48px; margin-bottom: 15px; }
+    .modal-close { background: var(--primary); color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; margin-top: 15px; }
+    .loading { display: inline-block; width: 20px; height: 20px; border: 3px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; margin-left: 10px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .info-box { background: #eff6ff; border-left: 4px solid var(--primary); padding: 10px; margin: 10px 0; font-size: 13px; border-radius: 4px; }
+    @media print {
+      .no-print, .btn-add, .btn-remove { display: none !important; }
+      body { padding: 0; background: white; }
+      .container { box-shadow: none; border: none; max-width: 100%; width: 100%; }
+      .block { page-break-inside: avoid; border: 1px solid #eee; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="no-print">
+      <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
+      <button class="btn-submit" onclick="enviarFormulario()" id="btnEnviar"> 📤 Enviar Formulário </button>
+    </div>
+
+    <div class="header">
+      <h1>📄 FORMULÁRIO DE CADASTRO</h1>
+      <p>Assistente Virtual ELISA v2.0</p>
+    </div>
+
+    <div class="welcome">
+      <h2>🎁 Bem-vindo ao treinamento da Elisa (sua secretária virtual)!</h2>
+      <p>Este formulário vai configurar as regras da sua assistente virtual. Preencha com calma e atenção. Tempo estimado: 30-45 minutos. Este formulário atende salão, spa e barbearia.</p>
+    </div>
+
+    <div class="block">
+      <div class="block-title">📌 BLOCO 1: IDENTIFICAÇÃO <span>Tempo: 5 min</span></div>
+
+      <div class="field">
+        <label>Nome do estabelecimento: *</label>
+        <input type="text" id="nome_salao" required onblur="validarCampo(this)" placeholder="Ex: Espaço de Beleza Requinte">
+        <span class="error-message">Por favor, preencha o nome do estabelecimento</span>
+      </div>
+
+      <div class="field">
+        <label>Como prefere ser chamado pelos clientes? (Ex: Studio Bella)</label>
+        <input type="text" id="apelido_salao" placeholder="Ex: Studio Bella">
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label>Seu nome completo:</label>
+          <input type="text" id="nome_completo" placeholder="Ex: Maria Oliveira dos Santos">
+        </div>
+        <div class="field">
+          <label>Como prefere ser chamado(a):</label>
+          <input type="text" id="apelido_proprietario" placeholder="Ex: Maria">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Seu cargo: (Ex: Proprietária, Gerente, Administrador)</label>
+        <input type="text" id="cargo" placeholder="Ex: Proprietária">
+      </div>
+
+      <h4 style="margin: 15px 0 10px">Contato</h4>
+
+      <div class="row">
+        <div class="field">
+          <label>WhatsApp Principal (para onde os clientes mandam msg): *</label>
+          <input type="tel" id="whatsapp" required onblur="validarCampo(this)" oninput="formatarWhatsApp(this)" placeholder="(11) 99999-9999">
+          <span class="error-message">Por favor, preencha um WhatsApp válido</span>
+          <div id="whatsapp_instancia_preview" style="display:none; margin-top:6px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; padding:8px 12px; font-size:13px; color:#166534;">
+            📲 <strong>Instância WhatsApp:</strong> <span id="whatsapp_instancia_texto" style="font-family:monospace;"></span>
+            <input type="hidden" id="whatsapp_instancia">
+          </div>
+        </div>
+        <div class="field">
+          <label>Telefone fixo (se houver):</label>
+          <input type="tel" id="telefone_fixo" oninput="formatarTelefone(this)" placeholder="(11) 4000-0000">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Telefone para transferência (caso cliente queira falar com responsável): *</label>
+        <input type="tel" id="telefone_transferencia" required onblur="validarCampo(this)" oninput="formatarTelefone(this)" placeholder="(11) 99999-9999">
+        <div class="info-box">💡 Este número será usado quando o cliente solicitar falar diretamente com um responsável.</div>
+        <span class="error-message">Por favor, preencha um telefone válido para transferência</span>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label>Instagram:</label>
+          <input type="text" id="instagram" placeholder="Ex: @salaorequinte_oficial">
+        </div>
+        <div class="field">
+          <label>E-mail (para receber os relatórios):</label>
+          <input type="email" id="email" onblur="validarEmail(this)" placeholder="Ex: contato@seusalao.com.br">
+          <span class="error-message">Por favor, insira um e-mail válido</span>
+        </div>
+      </div>
+
+      <h4 style="margin: 15px 0 10px">Localização</h4>
+
+      <div class="field">
+        <label>Rua, Número e Complemento:</label>
+        <input type="text" id="endereco" placeholder="Ex: Rua das Flores, 123, Sala 10 - Centro">
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label>Bairro:</label>
+          <input type="text" id="bairro" placeholder="Ex: Vila Mariana">
+        </div>
+        <div class="field">
+          <label>Cidade/Estado:</label>
+          <input type="text" id="cidade" placeholder="Ex: São Paulo / SP">
+        </div>
+        <div class="field">
+          <label>CEP:</label>
+          <input type="text" id="cep" placeholder="Ex: 01234-567">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Como chegar? (Ponto de referência e dicas):</label>
+        <textarea rows="2" id="ponto_referencia" placeholder="Ex: Ao lado da Farmácia Popular, em frente à Praça da Matriz."></textarea>
+      </div>
+
+      <div class="field">
+        <label>Tem estacionamento?</label>
+        <div class="checkbox-group">
+          <label class="checkbox-item"><input type="radio" name="estacionamento" value="gratuito"> Gratuito na rua</label>
+          <label class="checkbox-item"><input type="radio" name="estacionamento" value="pago"> Pago (parceria ou próprio)</label>
+          <label class="checkbox-item"><input type="radio" name="estacionamento" value="nao"> Não tem</label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>É acessível para cadeirantes?</label>
+        <div class="checkbox-group">
+          <label class="checkbox-item"><input type="radio" name="acessibilidade" value="total"> Sim, totalmente</label>
+          <label class="checkbox-item"><input type="radio" name="acessibilidade" value="ajuda"> Sim, com ajuda</label>
+          <label class="checkbox-item"><input type="radio" name="acessibilidade" value="nao"> Não</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="block-title">🕐 BLOCO 2: HORÁRIOS DE ATENDIMENTO <span>Tempo: 3 min</span></div>
+      <p style="font-size: 13px; color: var(--text-light); margin-bottom: 10px;">Indique os horários de funcionamento do estabelecimento para o público.</p>
+      <table id="tabela-horarios">
+        <tr>
+          <th>Dia da Semana</th>
+          <th>Abre?</th>
+          <th>Horário (Início - Fim)</th>
+          <th>Pausa Almoço/Intervalo</th>
+        </tr>
+        <tr>
+          <td>Segunda-feira</td>
+          <td><input type="checkbox" name="abre_seg"></td>
+          <td><input type="text" name="horario_seg" placeholder="Ex: 09:00 às 18:00"></td>
+          <td><input type="text" name="pausa_seg" placeholder="Ex: 12:00 às 13:00"></td>
+        </tr>
+        <tr>
+          <td>Terça-feira</td>
+          <td><input type="checkbox" name="abre_ter"></td>
+          <td><input type="text" name="horario_ter" placeholder="Ex: 09:00 às 18:00"></td>
+          <td><input type="text" name="pausa_ter" placeholder="Ex: 12:00 às 13:00"></td>
+        </tr>
+        <tr>
+          <td>Quarta-feira</td>
+          <td><input type="checkbox" name="abre_qua"></td>
+          <td><input type="text" name="horario_qua" placeholder="Ex: 09:00 às 18:00"></td>
+          <td><input type="text" name="pausa_qua" placeholder="Ex: 12:00 às 13:00"></td>
+        </tr>
+        <tr>
+          <td>Quinta-feira</td>
+          <td><input type="checkbox" name="abre_qui"></td>
+          <td><input type="text" name="horario_qui" placeholder="Ex: 09:00 às 18:00"></td>
+          <td><input type="text" name="pausa_qui" placeholder="Ex: 12:00 às 13:00"></td>
+        </tr>
+        <tr>
+          <td>Sexta-feira</td>
+          <td><input type="checkbox" name="abre_sex"></td>
+          <td><input type="text" name="horario_sex" placeholder="Ex: 08:00 às 19:00"></td>
+          <td><input type="text" name="pausa_sex" placeholder="Ex: 12:00 às 13:00"></td>
+        </tr>
+        <tr>
+          <td>Sábado</td>
+          <td><input type="checkbox" name="abre_sab"></td>
+          <td><input type="text" name="horario_sab" placeholder="Ex: 08:00 às 16:00"></td>
+          <td><input type="text" name="pausa_sab" placeholder="Ex: Sem pausa"></td>
+        </tr>
+        <tr>
+          <td>Domingo</td>
+          <td><input type="checkbox" name="abre_dom"></td>
+          <td><input type="text" name="horario_dom" placeholder="Ex: Fechado"></td>
+          <td><input type="text" name="pausa_dom" placeholder="Ex: -"></td>
+        </tr>
+      </table>
+      <div class="field">
+        <label>Atende em feriados?</label>
+        <div class="checkbox-group">
+          <label class="checkbox-item"><input type="checkbox" name="feriados" value="todos"> Sim, todos</label>
+          <label class="checkbox-item"><input type="checkbox" name="feriados" value="alguns"> Sim, alguns (sob consulta)</label>
+          <label class="checkbox-item"><input type="checkbox" name="feriados" value="nao"> Não</label>
+        </div>
+      </div>
+      <div class="field">
+        <label>Fecha em algum período do ano? (Férias coletivas, etc):</label>
+        <input type="text" id="ferias_coletivas" placeholder="Ex: Sim, de 24/12 a 05/01">
+      </div>
+    </div>
+
+    <div class="block" id="bloco-servicos">
+      <div class="block-title">💇 BLOCO 3: SERVIÇOS E PREÇOS <span>Tempo: 15 min</span></div>
+      <p style="font-size: 13px; color: var(--text-light); margin-bottom: 15px;">Liste os principais serviços. Isso ajuda a ELISA a orientar os clientes.</p>
+      <div id="lista-servicos">
+        <div class="card service-item">
+          <div class="field">
+            <label>Nome do serviço:</label>
+            <input type="text" name="servico_nome" placeholder="Ex: Corte Feminino Bordado">
+          </div>
+          <div class="field">
+            <label>Descrição breve (o que inclui):</label>
+            <input type="text" name="servico_descricao" placeholder="Ex: Corte focado em eliminar pontas duplas sem tirar o comprimento.">
+          </div>
+          <div class="row">
+            <div class="field">
+              <label>Duração aproximada (min):</label>
+              <input type="text" name="servico_duracao" placeholder="Ex: 60">
+            </div>
+            <div class="field">
+              <label>Valor: R$</label>
+              <input type="text" name="servico_valor" placeholder="Ex: 120,00">
+            </div>
+          </div>
+          <div class="field">
+            <label>Profissional(is) que realiza(m) este serviço:</label>
+            <input type="text" name="servico_profissionais" placeholder="Ex: Renata, Julia, Carlos">
+            <div class="info-box">💡 Liste todos os profissionais que podem fazer este serviço, separados por vírgula.</div>
+          </div>
+          <div class="field">
+            <label>Observação adicional:</label>
+            <textarea rows="2" name="servico_obs" placeholder="Ex: Cliente pode escolher o profissional no agendamento."></textarea>
+          </div>
+        </div>
+      </div>
+      <button class="btn-add" onclick="addServico()">+ Adicionar outro serviço</button>
+
+      <h4 style="margin-top: 25px">🎁 Combos e Pacotes Especial</h4>
+      <div id="lista-combos">
+        <div class="card combo-item">
+          <div class="field">
+            <label>Nome do Combo:</label>
+            <input type="text" name="combo_nome" placeholder="Ex: Combo Pé e Mão Completo">
+          </div>
+          <div class="field">
+            <label>Serviços inclusos no combo:</label>
+            <textarea rows="2" name="combo_servicos" placeholder="Ex: Manicure completa com esmaltação + Pedicure com spa dos pés + Hidratação das mãos"></textarea>
+          </div>
+          <div class="field">
+            <label>Profissional(is) que realiza(m) os serviços do combo:</label>
+            <input type="text" name="combo_profissionais" placeholder="Ex: Juliana (manicure e pedicure), Ana (hidratação)">
+            <div class="info-box">💡 Especifique quem faz cada serviço do combo, se necessário.</div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label>Duração total do combo (min):</label>
+              <input type="text" name="combo_duracao" placeholder="Ex: 90">
+            </div>
+            <div class="field">
+              <label>Valor Combo: R$</label>
+              <input type="text" name="combo_valor" placeholder="Ex: 95,00">
+            </div>
+          </div>
+          <div class="field">
+            <label>Vantagem/Economia:</label>
+            <input type="text" name="combo_economia" placeholder="Ex: Economize R$ 15,00 comprando junto">
+          </div>
+        </div>
+      </div>
+      <button class="btn-add" onclick="addCombo()">+ Adicionar outro combo</button>
+    </div>
+
+    <div class="block">
+      <div class="block-title">👥 BLOCO 4: EQUIPE <span>Tempo: 5 min</span></div>
+      <div id="lista-equipe">
+        <div class="card professional-item">
+          <div class="row">
+            <div class="field">
+              <label>Nome do Profissional:</label>
+              <input type="text" name="prof_nome" placeholder="Ex: Juliana Almeida">
+            </div>
+            <div class="field">
+              <label>Como quer ser chamado (apelido):</label>
+              <input type="text" name="prof_apelido" placeholder="Ex: Ju">
+            </div>
+          </div>
+          <div class="field">
+            <label>Serviços que realiza:</label>
+            <input type="text" name="prof_servicos" placeholder="Ex: Manicure, Pedicure e Depilação">
+          </div>
+          <div class="field">
+            <label>Dias de atendimento:</label>
+            <div class="checkbox-group">
+              <label class="checkbox-item"><input type="checkbox" name="prof_dias_seg"> Seg</label>
+              <label class="checkbox-item"><input type="checkbox" name="prof_dias_ter"> Ter</label>
+              <label class="checkbox-item"><input type="checkbox" name="prof_dias_qua"> Qua</label>
+              <label class="checkbox-item"><input type="checkbox" name="prof_dias_qui"> Qui</label>
+              <label class="checkbox-item"><input type="checkbox" name="prof_dias_sex"> Sex</label>
+              <label class="checkbox-item"><input type="checkbox" name="prof_dias_sab"> Sáb</label>
+              <label class="checkbox-item"><input type="checkbox" name="prof_dias_dom"> Dom</label>
+            </div>
+          </div>
+          <div class="field">
+            <label>Horário de atendimento deste profissional:</label>
+            <input type="text" name="prof_horario" placeholder="Ex: 09:00 às 18:00, intervalo das 12:00 às 13:00">
+            <div class="info-box">💡 Especifique o horário que este profissional atende, se for diferente do horário geral do estabelecimento.</div>
+          </div>
+        </div>
+      </div>
+      <button class="btn-add" onclick="addProfissional()">+ Adicionar outro profissional</button>
+    </div>
+
+    <div class="block">
+      <div class="block-title">💳 BLOCO 5: FORMAS DE PAGAMENTO <span>Tempo: 2 min</span></div>
+      <div class="field">
+        <label>Quais formas aceita?</label>
+        <div class="checkbox-group">
+          <label class="checkbox-item"><input type="checkbox" name="pagamento" value="dinheiro"> Dinheiro</label>
+          <label class="checkbox-item"><input type="checkbox" name="pagamento" value="pix"> PIX</label>
+          <label class="checkbox-item"><input type="checkbox" name="pagamento" value="debito"> Débito</label>
+          <label class="checkbox-item"><input type="checkbox" name="pagamento" value="credito"> Crédito</label>
+          <label class="checkbox-item"><input type="checkbox" name="pagamento" value="vale"> Vale-presente</label>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Possui parcelamento no cartão? (Ex: Até 3x sem juros)</label>
+          <input type="text" id="parcelamento" placeholder="Ex: Sim, em até 3x sem juros ou 10x com juros">
+        </div>
+        <div class="field">
+          <label>Cobra sinal/pagamento antecipado?</label>
+          <input type="text" id="sinal" placeholder="Ex: Não / Sim, 30% para procedimentos longos">
+        </div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="block-title">📅 BLOCO 6: REGRAS DE AGENDAMENTO <span>Tempo: 5 min</span></div>
+      <div class="field">
+        <label>Antecedência mínima para agendar (Ex: 2 horas antes):</label>
+        <input type="text" id="antecedencia" placeholder="Ex: Pelo menos 2 horas antes">
+      </div>
+      <div class="field">
+        <label>Aceita encaixe?</label>
+        <div class="checkbox-group">
+          <label class="checkbox-item"><input type="checkbox" name="encaixe" value="sim"> Sim (sob consulta)</label>
+          <label class="checkbox-item"><input type="checkbox" name="encaixe" value="nao"> Não</label>
+        </div>
+      </div>
+      <div class="field">
+        <label>Envia lembrete automático? Como funciona?</label>
+        <input type="text" id="lembrete" placeholder="Ex: Sim, enviamos 24 horas e 2 horas antes">
+      </div>
+      <h4 style="margin: 15px 0 10px">🚫 Cancelamento e Reagendamento</h4>
+      <div class="row">
+        <div class="field">
+          <label>Prazo mínimo para cancelar:</label>
+          <input type="text" id="prazo_cancelamento" placeholder="Ex: Até 12 horas antes">
+        </div>
+        <div class="field">
+          <label>Existe alguma penalidade?</label>
+          <input type="text" id="penalidade" placeholder="Ex: Perda do sinal ou taxa de R$ 20,00 na próxima visita">
+        </div>
+      </div>
+      <div class="field">
+        <label>Regra para Reagendamento:</label>
+        <input type="text" id="reagendamento" placeholder="Ex: Permitido uma vez com antecedência de 6 horas">
+      </div>
+      <h4 style="margin: 15px 0 10px">⏰ Atraso</h4>
+      <div class="field">
+        <label>Tolerância máxima de atraso em minutos:</label>
+        <input type="text" id="tolerancia_atraso" placeholder="Ex: 15 minutos">
+      </div>
+      <div class="field">
+        <label>O que acontece após o limite de tolerância?</label>
+        <textarea rows="2" id="politica_atraso" placeholder="Ex: O atendimento será reduzido ou cancelado dependendo da agenda."></textarea>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="block-title">🎁 BLOCO 7: PROMOÇÕES E FIDELIDADE <span>Tempo: 3 min</span></div>
+      <div class="field">
+        <label>Promoções Ativas no momento:</label>
+        <textarea rows="2" id="promocoes" placeholder="Ex: Terça da Hidratação: 20% OFF / Indique uma amiga e ganhe um pé e mão."></textarea>
+      </div>
+      <div class="field">
+        <label>Possui Programa de Fidelidade? Como funciona?</label>
+        <textarea rows="2" id="fidelidade" placeholder="Ex: A cada 10 cortes, o 11º é gratuito."></textarea>
+      </div>
+      <div class="field">
+        <label>Oferece benefício para aniversariante?</label>
+        <input type="text" id="aniversariante" placeholder="Ex: 15% de desconto em qualquer serviço no mês do aniversário.">
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="block-title">🎂 BLOCO 8: SERVIÇOS ESPECIAIS <span>Tempo: 3 min</span></div>
+      <div class="field">
+        <label>Realiza eventos em grupo / festas?</label>
+        <input type="text" id="eventos_grupo" placeholder="Ex: Fazemos pacotes para Spa Day e despedida de solteira.">
+      </div>
+      <div class="field">
+        <label>Profissional(is) que realiza(m) eventos em grupo:</label>
+        <input type="text" id="eventos_profissionais" placeholder="Ex: Juliana, Ana e Cris (equipe completa)">
+      </div>
+      <div class="field">
+        <label>Quais serviços são oferecidos em eventos de grupo?</label>
+        <textarea rows="2" id="eventos_servicos" placeholder="Ex: Manicure express, Make básica, Penteados simples, Massagem relaxante"></textarea>
+      </div>
+      <div class="field">
+        <label>Faz atendimento a domicílio? (Taxa e Regras):</label>
+        <input type="text" id="domicilio" placeholder="Ex: Sim, apenas no bairro Centro. Taxa fixa de R$ 30,00.">
+      </div>
+      <div class="field">
+        <label>Profissional(is) que faz(em) atendimento a domicílio:</label>
+        <input type="text" id="domicilio_profissionais" placeholder="Ex: Ana e Juliana">
+      </div>
+      <div class="field">
+        <label>Quais serviços são oferecidos a domicílio?</label>
+        <input type="text" id="domicilio_servicos" placeholder="Ex: Manicure, Pedicure, Maquiagem e Penteados">
+      </div>
+      <div class="field">
+        <label>Possui Pacote de Noivas / Debutantes?</label>
+        <textarea rows="2" id="pacote_noivas" placeholder="Ex: Pacote completo com teste, penteado, make e massagem. Solicite orçamento."></textarea>
+      </div>
+      <div class="field">
+        <label>Profissional(is) responsável(is) por pacotes de noivas:</label>
+        <input type="text" id="noivas_profissionais" placeholder="Ex: Ana (cabelo), Juliana (maquiagem)">
+      </div>
+      <div class="field">
+        <label>Serviços inclusos no pacote noivas/debutantes:</label>
+        <textarea rows="2" id="noivas_servicos" placeholder="Ex: Prova de penteado, dia da noiva com maquiagem profissional, penteado elaborado, manicure e pedicure"></textarea>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="block-title">🧴 BLOCO 9: PRODUTOS E MATERIAIS <span>Tempo: 2 min</span></div>
+      <div class="field">
+        <label>Vende produtos físicos no estabelecimento? (Quais e preços base):</label>
+        <textarea rows="2" id="produtos" placeholder="Ex: Shampoos profissionais (R$ 80), Óleos reparadores (R$ 45)."></textarea>
+      </div>
+      <div class="field">
+        <label>O cliente pode trazer material próprio? (Ex: esmalte, toalha):</label>
+        <input type="text" id="material_proprio" placeholder="Ex: Sim, mas o valor do serviço permanece o mesmo.">
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="block-title">🏥 BLOCO 10: CUIDADOS E RESTRIÇÕES <span>Tempo: 3 min</span></div>
+      <div class="field">
+        <label>Existem restrições de público? (Ex: Apenas mulheres, não atende crianças):</label>
+        <textarea rows="2" id="restricoes" placeholder="Ex: Atendimento infantil apenas acima de 5 anos acompanhado de responsável."></textarea>
+      </div>
+      <div class="field">
+        <label>Contraindicações e Avisos Importantes (Ex: Diabetes, Alergias):</label>
+        <textarea rows="2" id="contraindicacoes" placeholder="Ex: Favor informar alergia a esmaltes ou produtos de química capilar."></textarea>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="block-title">🌟 BLOCO 11: DIFERENCIAIS E ESTRUTURA <span>Tempo: 2 min</span></div>
+      <div class="field">
+        <label>Diferenciais do seu estabelecimento (Certificações, Mimos):</label>
+        <input type="text" id="diferenciais" placeholder="Ex: Especialistas em loiras; oferecemos café gourmet e bombons.">
+      </div>
+      <div class="field">
+        <label>Comodidades disponíveis:</label>
+        <div class="checkbox-group">
+          <label class="checkbox-item"><input type="checkbox" name="comodidades" value="wifi"> Wi-Fi para clientes</label>
+          <label class="checkbox-item"><input type="checkbox" name="comodidades" value="cafe"> Café / Água</label>
+          <label class="checkbox-item"><input type="checkbox" name="comodidades" value="ar"> Ar-condicionado</label>
+          <label class="checkbox-item"><input type="checkbox" name="comodidades" value="espera"> Sala de Espera</label>
+          <label class="checkbox-item"><input type="checkbox" name="comodidades" value="pet"> Pet Friendly</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="block-title">📞 BLOCO 12: RECLAMAÇÕES E GARANTIAS <span>Tempo: 2 min</span></div>
+      <div class="field">
+        <label>Qual a política se o cliente não gostar do resultado?</label>
+        <textarea rows="2" id="politica_insatisfacao" placeholder="Ex: Oferecemos retoque gratuito em até 5 dias após o procedimento."></textarea>
+      </div>
+      <div class="field">
+        <label>WhatsApp para reclamações (onde a ELISA deve encaminhar):</label>
+        <input type="tel" id="whatsapp_reclamacoes" oninput="formatarTelefone(this)" placeholder="Ex: (11) 99999-9999">
+        <div class="info-box">💡 Este é o WhatsApp para onde a ELISA encaminhará clientes insatisfeitos ou com reclamações. Pode ser o mesmo do atendimento principal ou um número exclusivo para gestão.</div>
+      </div>
+      <div class="field">
+        <label>Qual o prazo e canal de resposta para reclamações?</label>
+        <input type="text" id="prazo_resposta" placeholder="Ex: Respondemos em até 2 horas úteis via WhatsApp.">
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="block-title">🎯 BLOCO 13: TOM DE ATENDIMENTO DA ELISA <span>Tempo: 1 min</span></div>
+      <div class="field">
+        <label>Qual o estilo de conversa da sua ELISA?</label>
+        <select id="estilo_elisa">
+          <option value="amigavel">Amigável e Próxima (Usa 'querida', 'flor')</option>
+          <option value="formal">Formal e Profissional (Usa 'Senhor(a)')</option>
+          <option value="divertida">Divertida e Descontraída (Usa gírias leves)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Pode usar emojis? Quais prefere?</label>
+        <input type="text" id="uso_emojis" placeholder="Ex: Sim, de forma moderada 🌸">
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Expressões que DEVE usar:</label>
+          <input type="text" id="expressoes_usar" placeholder="Ex: 'Seja bem-vinda', 'Querida', 'Fique à vontade'">
+        </div>
+        <div class="field">
+          <label>Expressões Proibidas:</label>
+          <input type="text" id="expressoes_proibidas" placeholder="Ex: 'Peraí', 'Não sei', 'Gírias pesadas'">
+        </div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="block-title">📊 BLOCO 14: INFORMAÇÕES OPERACIONAIS <span>Tempo: 1 min</span></div>
+      <div class="field">
+        <label>Horário de maior movimento (Para evitar oferecer encaixes):</label>
+        <input type="text" id="horario_pico" placeholder="Ex: Quintas e Sextas após as 17h.">
+      </div>
+      <div class="field">
+        <label>Qual o serviço mais procurado (carro-chefe):</label>
+        <input type="text" id="servico_popular" placeholder="Ex: Coloração e Design de Sobrancelhas.">
+      </div>
+      <div class="field">
+        <label>Sazonalidade (Épocas do ano com maior pico):</label>
+        <input type="text" id="sazonalidade" placeholder="Ex: Mês de Dezembro e vésperas de feriado.">
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="block-title">📝 BLOCO 15: PERGUNTAS FREQUENTES (FAQ) <span>Tempo: 5 min</span></div>
+      <p style="font-size: 13px; color: var(--text-light); margin-bottom: 10px;">Adicione perguntas que os clientes sempre fazem e como a ELISA deve responder.</p>
+      <div id="lista-faq">
+        <div class="card faq-item">
+          <div class="field">
+            <label>Pergunta comum do cliente:</label>
+            <input type="text" name="faq_pergunta" placeholder="Ex: Vocês fazem alongamento em gel?">
+          </div>
+          <div class="field">
+            <label>Resposta ideal da ELISA:</label>
+            <input type="text" name="faq_resposta" placeholder="Ex: Sim! Temos especialistas em unhas em gel, o valor é R$ 150.">
+          </div>
+        </div>
+      </div>
+      <button class="btn-add" onclick="addFaq()">+ Adicionar outra pergunta</button>
+    </div>
+
+    <div class="block">
+      <div class="block-title">📦 ESPAÇO EXTRA</div>
+      <label>Alguma outra informação importante que não foi perguntada?</label>
+      <textarea rows="5" id="observacoes_extras" placeholder="Ex: Temos uma parceria com o café ao lado onde nossos clientes ganham desconto..."></textarea>
+    </div>
+
+    <div class="block" style="border: 2px solid var(--success)">
+      <div class="field">
+        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+          <input type="checkbox" id="confirma_info" style="width: 20px; height: 20px;"> Confirmo que todas as informações acima são verdadeiras.
+        </label>
+      </div>
+      <div class="field">
+        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+          <input type="checkbox" id="autoriza_config" style="width: 20px; height: 20px;"> Autorizo a ELISA a utilizar esses dados para configurar meu atendimento.
+        </label>
+      </div>
+
+      <div class="row" style="margin-top: 20px;">
+        <div class="field">
+          <label>Nome Completo do Responsável (Assinatura): *</label>
+          <input type="text" id="assinatura" required onblur="validarCampo(this)" placeholder="Digite seu nome completo para assinar">
+          <span class="error-message">Por favor, preencha seu nome completo</span>
+        </div>
+        <div class="field">
+          <label>Data:</label>
+          <input type="text" id="data_atual" readonly style="background: #f1f5f9;">
+        </div>
+      </div>
+    </div>
+
+    <div class="no-print" style="margin-top: 30px; margin-bottom: 50px;">
+      <button class="btn-submit" onclick="enviarFormulario()" id="btnEnviar2"> 📤 Enviar Formulário de Configuração </button>
+    </div>
+
+    <p style="text-align: center; color: var(--text-light); font-size: 12px; margin-top: 20px;">
+      🔒 Seus dados estão protegidos pela nossa Política de Privacidade.<br>
+      ELISA - Sua Assistente Virtual Inteligente.
+    </p>
+  </div>
+
+  <div id="modal" class="modal">
+    <div class="modal-content" id="modalContent">
+      <div class="modal-icon" id="modalIcon"></div>
+      <h2 id="modalTitle"></h2>
+      <p id="modalMessage" style="margin: 15px 0;"></p>
+      <button class="modal-close" onclick="fecharModal()">Entendi</button>
+    </div>
+  </div>
+
+  <script>
+    // Definir data atual
+    document.addEventListener('DOMContentLoaded', function() {
+      const hoje = new Date();
+      const dataFormatada = hoje.toLocaleDateString('pt-BR');
+      document.getElementById('data_atual').value = dataFormatada;
+    });
+
+    function validarCampo(input) {
+      if (input.hasAttribute('required') && !input.value.trim()) {
+        input.classList.add('error');
+        input.classList.remove('success');
+        const errorMsg = input.nextElementSibling;
+        if (errorMsg && errorMsg.classList.contains('error-message')) {
+          errorMsg.classList.add('show');
+        }
+        return false;
+      } else {
+        input.classList.remove('error');
+        input.classList.add('success');
+        const errorMsg = input.nextElementSibling;
+        if (errorMsg && errorMsg.classList.contains('error-message')) {
+          errorMsg.classList.remove('show');
+        }
+        return true;
+      }
+    }
+
+    function validarEmail(input) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (input.value && !emailRegex.test(input.value)) {
+        input.classList.add('error');
+        return false;
+      }
+      input.classList.remove('error');
+      return true;
+    }
+
+    function formatarTelefone(input) {
+      let value = input.value.replace(/\D/g, '');
+      if (value.length > 11) value = value.slice(0, 11);
+      if (value.length > 10) {
+        value = value.replace(/^(\d{2})(\d{5})(\d{4}).*/, '($1) $2-$3');
+      } else if (value.length > 5) {
+        value = value.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, '($1) $2-$3');
+      } else if (value.length > 2) {
+        value = value.replace(/^(\d{2})(\d{0,5})/, '($1) $2');
+      } else if (value.length > 0) {
+        value = value.replace(/^(\d*)/, '($1');
+      }
+      input.value = value;
+    }
+
+    function formatarWhatsApp(input) {
+      // Formata visualmente igual ao formatarTelefone
+      let value = input.value.replace(/\D/g, '');
+      if (value.length > 11) value = value.slice(0, 11);
+
+      let displayValue = value;
+      if (value.length > 10) {
+        displayValue = value.replace(/^(\d{2})(\d{5})(\d{4}).*/, '($1) $2-$3');
+      } else if (value.length > 5) {
+        displayValue = value.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, '($1) $2-$3');
+      } else if (value.length > 2) {
+        displayValue = value.replace(/^(\d{2})(\d{0,5})/, '($1) $2');
+      } else if (value.length > 0) {
+        displayValue = value.replace(/^(\d*)/, '($1');
+      }
+
+      input.value = displayValue;
+
+      // Gera a instância: 55 + DDD + número sem o 9 inicial
+      const preview = document.getElementById('whatsapp_instancia_preview');
+      const texto = document.getElementById('whatsapp_instancia_texto');
+      const hidden = document.getElementById('whatsapp_instancia');
+
+      if (value.length === 11) {
+        // value: DDD (2) + 9 (1) + número (8) = 11 dígitos
+        const ddd = value.slice(0, 2); // ex: 48
+        const semNove = value.slice(3); // remove o 9 do 3º dígito, pega os 8 restantes
+        const instancia = '55' + ddd + semNove + '@s.whatsapp.net';
+
+        texto.textContent = instancia;
+        hidden.value = instancia;
+        preview.style.display = 'block';
+      } else {
+        preview.style.display = 'none';
+        hidden.value = '';
+      }
+    }
+
+    function addServico() {
+      const container = document.getElementById('lista-servicos');
+      const div = document.createElement('div');
+      div.className = 'card service-item';
+      div.innerHTML = `
+        <button class="btn-remove" onclick="this.parentElement.remove()">✕</button>
+        <div class="field"><label>Nome do serviço:</label><input type="text" name="servico_nome" placeholder="Ex: Manicure Simples"></div>
+        <div class="field"><label>Descrição breve:</label><input type="text" name="servico_descricao" placeholder="Ex: Corte e esmaltação comum."></div>
+        <div class="row">
+          <div class="field"><label>Duração aproximada (min):</label><input type="text" name="servico_duracao" placeholder="Ex: 40"></div>
+          <div class="field"><label>Valor: R$</label><input type="text" name="servico_valor" placeholder="Ex: 35,00"></div>
+        </div>
+        <div class="field"><label>Profissional(is) que realiza(m):</label><input type="text" name="servico_profissionais" placeholder="Ex: Juliana, Ana"></div>
+        <div class="field"><label>Observação adicional:</label><textarea rows="2" name="servico_obs" placeholder="Ex: Cliente pode escolher o profissional no agendamento."></textarea></div>
+      `;
+      container.appendChild(div);
+    }
+
+    function addCombo() {
+      const container = document.getElementById('lista-combos');
+      const div = document.createElement('div');
+      div.className = 'card combo-item';
+      div.innerHTML = `
+        <button class="btn-remove" onclick="this.parentElement.remove()">✕</button>
+        <div class="field"><label>Nome do Combo:</label><input type="text" name="combo_nome" placeholder="Ex: Super Combo Fim de Semana"></div>
+        <div class="field"><label>Serviços inclusos:</label><textarea rows="2" name="combo_servicos" placeholder="Ex: Manicure + Pedicure + Hidratação"></textarea></div>
+        <div class="field"><label>Profissional(is):</label><input type="text" name="combo_profissionais" placeholder="Ex: Juliana ou Cris"></div>
+        <div class="row">
+          <div class="field"><label>Duração total (min):</label><input type="text" name="combo_duracao" placeholder="Ex: 90"></div>
+          <div class="field"><label>Valor: R$</label><input type="text" name="combo_valor" placeholder="Ex: 150,00"></div>
+        </div>
+        <div class="field"><label>Vantagem/Economia:</label><input type="text" name="combo_economia" placeholder="Ex: Economize R$ 20,00"></div>
+      `;
+      container.appendChild(div);
+    }
+
+    function addProfissional() {
+      const container = document.getElementById('lista-equipe');
+      const div = document.createElement('div');
+      div.className = 'card professional-item';
+      div.innerHTML = `
+        <button class="btn-remove" onclick="this.parentElement.remove()">✕</button>
+        <div class="row">
+          <div class="field"><label>Nome do Profissional:</label><input type="text" name="prof_nome" placeholder="Ex: Carlos Silva"></div>
+          <div class="field"><label>Apelido:</label><input type="text" name="prof_apelido" placeholder="Ex: Carlinhos"></div>
+        </div>
+        <div class="field"><label>Serviços que realiza:</label><input type="text" name="prof_servicos" placeholder="Ex: Apenas Corte Masculino e Barba"></div>
+        <div class="field">
+          <label>Dias de atendimento:</label>
+          <div class="checkbox-group">
+            <label class="checkbox-item"><input type="checkbox" name="prof_dias_seg"> Seg</label>
+            <label class="checkbox-item"><input type="checkbox" name="prof_dias_ter"> Ter</label>
+            <label class="checkbox-item"><input type="checkbox" name="prof_dias_qua"> Qua</label>
+            <label class="checkbox-item"><input type="checkbox" name="prof_dias_qui"> Qui</label>
+            <label class="checkbox-item"><input type="checkbox" name="prof_dias_sex"> Sex</label>
+            <label class="checkbox-item"><input type="checkbox" name="prof_dias_sab"> Sáb</label>
+            <label class="checkbox-item"><input type="checkbox" name="prof_dias_dom"> Dom</label>
+          </div>
+        </div>
+        <div class="field"><label>Horário de atendimento deste profissional:</label><input type="text" name="prof_horario" placeholder="Ex: 09:00 às 18:00, intervalo das 12:00 às 13:00"></div>
+      `;
+      container.appendChild(div);
+    }
+
+    function addFaq() {
+      const container = document.getElementById('lista-faq');
+      const div = document.createElement('div');
+      div.className = 'card faq-item';
+      div.innerHTML = `
+        <button class="btn-remove" onclick="this.parentElement.remove()">✕</button>
+        <div class="field"><label>Pergunta comum do cliente:</label><input type="text" name="faq_pergunta" placeholder="Ex: Tem Wi-Fi no local?"></div>
+        <div class="field"><label>Resposta ideal da ELISA:</label><input type="text" name="faq_resposta" placeholder="Ex: Sim, temos Wi-Fi liberado para clientes."></div>
+      `;
+      container.appendChild(div);
+    }
+
+    function coletarDados() {
+      const dados = {
+        identificacao: {
+          nome_salao: document.getElementById('nome_salao').value,
+          apelido_salao: document.getElementById('apelido_salao').value,
+          nome_proprietario: document.getElementById('nome_completo').value,
+          apelido_proprietario: document.getElementById('apelido_proprietario').value,
+          cargo: document.getElementById('cargo').value,
+          contato: {
+            whatsapp: document.getElementById('whatsapp').value,
+            whatsapp_instancia: document.getElementById('whatsapp_instancia').value,
+            fixo: document.getElementById('telefone_fixo').value,
+            transferencia: document.getElementById('telefone_transferencia').value,
+            instagram: document.getElementById('instagram').value,
+            email: document.getElementById('email').value
+          },
+          localizacao: {
+            endereco: document.getElementById('endereco').value,
+            bairro: document.getElementById('bairro').value,
+            cidade_estado: document.getElementById('cidade').value,
+            cep: document.getElementById('cep').value,
+            referencia: document.getElementById('ponto_referencia').value,
+            estacionamento: document.querySelector('input[name="estacionamento"]:checked')?.value,
+            acessibilidade: document.querySelector('input[name="acessibilidade"]:checked')?.value
+          }
+        },
+        horarios: {
+          seg: { abre: document.querySelector('input[name="abre_seg"]').checked, horario: document.querySelector('input[name="horario_seg"]').value, pausa: document.querySelector('input[name="pausa_seg"]').value },
+          ter: { abre: document.querySelector('input[name="abre_ter"]').checked, horario: document.querySelector('input[name="horario_ter"]').value, pausa: document.querySelector('input[name="pausa_ter"]').value },
+          qua: { abre: document.querySelector('input[name="abre_qua"]').checked, horario: document.querySelector('input[name="horario_qua"]').value, pausa: document.querySelector('input[name="pausa_qua"]').value },
+          qui: { abre: document.querySelector('input[name="abre_qui"]').checked, horario: document.querySelector('input[name="horario_qui"]').value, pausa: document.querySelector('input[name="pausa_qui"]').value },
+          sex: { abre: document.querySelector('input[name="abre_sex"]').checked, horario: document.querySelector('input[name="horario_sex"]').value, pausa: document.querySelector('input[name="pausa_sex"]').value },
+          sab: { abre: document.querySelector('input[name="abre_sab"]').checked, horario: document.querySelector('input[name="horario_sab"]').value, pausa: document.querySelector('input[name="pausa_sab"]').value },
+          dom: { abre: document.querySelector('input[name="abre_dom"]').checked, horario: document.querySelector('input[name="horario_dom"]').value, pausa: document.querySelector('input[name="pausa_dom"]').value },
+          feriados: Array.from(document.querySelectorAll('input[name="feriados"]:checked')).map(el => el.value),
+          ferias: document.getElementById('ferias_coletivas').value
+        },
+        servicos: Array.from(document.querySelectorAll('.service-item')).map(item => ({
+          nome: item.querySelector('input[name="servico_nome"]').value,
+          descricao: item.querySelector('input[name="servico_descricao"]').value,
+          duracao: item.querySelector('input[name="servico_duracao"]').value,
+          valor: item.querySelector('input[name="servico_valor"]').value,
+          profissionais: item.querySelector('input[name="servico_profissionais"]').value,
+          obs: item.querySelector('textarea[name="servico_obs"]').value
+        })),
+        combos: Array.from(document.querySelectorAll('.combo-item')).map(item => ({
+          nome: item.querySelector('input[name="combo_nome"]').value,
+          servicos_inclusos: item.querySelector('textarea[name="combo_servicos"]').value,
+          profissionais: item.querySelector('input[name="combo_profissionais"]').value,
+          duracao: item.querySelector('input[name="combo_duracao"]').value,
+          valor: item.querySelector('input[name="combo_valor"]').value,
+          vantagem: item.querySelector('input[name="combo_economia"]').value
+        })),
+        equipe: Array.from(document.querySelectorAll('.professional-item')).map(item => {
+          const diasSelecionados = [];
+          const checkboxes = item.querySelectorAll('input[type="checkbox"][name^="prof_dias"]');
+          checkboxes.forEach(cb => {
+            if (cb.checked) {
+              const dia = cb.name.replace('prof_dias_', '');
+              diasSelecionados.push(dia);
+            }
+          });
+          return {
+            nome: item.querySelector('input[name="prof_nome"]').value,
+            apelido: item.querySelector('input[name="prof_apelido"]').value,
+            servicos: item.querySelector('input[name="prof_servicos"]').value,
+            dias_atendimento: diasSelecionados,
+            horario: item.querySelector('input[name="prof_horario"]').value
+          };
+        }),
+        pagamento: {
+          metodos: Array.from(document.querySelectorAll('input[name="pagamento"]:checked')).map(el => el.value),
+          parcelamento: document.getElementById('parcelamento').value,
+          sinal: document.getElementById('sinal').value
+        },
+        regras: {
+          antecedencia: document.getElementById('antecedencia').value,
+          encaixe: document.querySelector('input[name="encaixe"]:checked')?.value,
+          lembrete: document.getElementById('lembrete').value,
+          cancelamento_prazo: document.getElementById('prazo_cancelamento').value,
+          cancelamento_penalidade: document.getElementById('penalidade').value,
+          reagendamento: document.getElementById('reagendamento').value,
+          atraso_tolerancia: document.getElementById('tolerancia_atraso').value,
+          atraso_politica: document.getElementById('politica_atraso').value
+        },
+        marketing: {
+          promocoes: document.getElementById('promocoes').value,
+          fidelidade: document.getElementById('fidelidade').value,
+          aniversariante: document.getElementById('aniversariante').value
+        },
+        especiais: {
+          eventos: document.getElementById('eventos_grupo').value,
+          eventos_profissionais: document.getElementById('eventos_profissionais').value,
+          eventos_servicos: document.getElementById('eventos_servicos').value,
+          domicilio: document.getElementById('domicilio').value,
+          domicilio_profissionais: document.getElementById('domicilio_profissionais').value,
+          domicilio_servicos: document.getElementById('domicilio_servicos').value,
+          noivas: document.getElementById('pacote_noivas').value,
+          noivas_profissionais: document.getElementById('noivas_profissionais').value,
+          noivas_servicos: document.getElementById('noivas_servicos').value
+        },
+        produtos: {
+          vendas: document.getElementById('produtos').value,
+          material_proprio: document.getElementById('material_proprio').value
+        },
+        cuidados: {
+          restricoes: document.getElementById('restricoes').value,
+          contraindicacoes: document.getElementById('contraindicacoes').value
+        },
+        estrutura: {
+          diferenciais: document.getElementById('diferenciais').value,
+          comodidades: Array.from(document.querySelectorAll('input[name="comodidades"]:checked')).map(el => el.value)
+        },
+        atendimento: {
+          insatisfacao: document.getElementById('politica_insatisfacao').value,
+          whatsapp_reclamacoes: document.getElementById('whatsapp_reclamacoes').value,
+          prazo_resposta: document.getElementById('prazo_resposta').value,
+          tom: document.getElementById('estilo_elisa').value,
+          emojis: document.getElementById('uso_emojis').value,
+          express_sim: document.getElementById('expressoes_usar').value,
+          express_nao: document.getElementById('expressoes_proibidas').value
+        },
+        operacional: {
+          pico: document.getElementById('horario_pico').value,
+          popular: document.getElementById('servico_popular').value,
+          sazonalidade: document.getElementById('sazonalidade').value
+        },
+        faq: Array.from(document.querySelectorAll('.faq-item')).map(item => ({
+          pergunta: item.querySelector('input[name="faq_pergunta"]').value,
+          resposta: item.querySelector('input[name="faq_resposta"]').value
+        })),
+        extra: document.getElementById('observacoes_extras').value,
+        assinatura: document.getElementById('assinatura').value,
+        data_envio: new Date().toLocaleString('pt-BR')
+      };
+
+      return dados;
+    }
+
+    async function enviarFormulario() {
+      const params = new URLSearchParams(window.location.search);
+      const onboarding_token = String(params.get('onboarding_token') || '').trim();
+      const salao_id = String(params.get('salao_id') || '').trim();
+
+      if (!onboarding_token) {
+        mostrarModal('error', 'Link inválido', 'Token de onboarding ausente. Volte no sistema e abra o formulário novamente.');
+        return;
+      }
+
+      const campoNome = document.getElementById('nome_salao');
+      const campoWhats = document.getElementById('whatsapp');
+      const campoTransferencia = document.getElementById('telefone_transferencia');
+      const campoAssinatura = document.getElementById('assinatura');
+      const check1 = document.getElementById('confirma_info');
+      const check2 = document.getElementById('autoriza_config');
+
+      let erro = false;
+      let mensagensErro = [];
+
+      if (!campoNome.value.trim()) { erro = true; campoNome.classList.add('error'); mensagensErro.push("Nome do Estabelecimento é obrigatório."); }
+      if (!campoWhats.value.trim() || campoWhats.value.replace(/\D/g,'').length < 11) { erro = true; campoWhats.classList.add('error'); mensagensErro.push("WhatsApp válido é obrigatório (com DDD + 9 dígitos)."); }
+      if (!campoTransferencia.value.trim() || campoTransferencia.value.length < 10) { erro = true; campoTransferencia.classList.add('error'); mensagensErro.push("Telefone para transferência é obrigatório."); }
+      if (!campoAssinatura.value.trim()) { erro = true; campoAssinatura.classList.add('error'); mensagensErro.push("Assinatura é obrigatória."); }
+      if (!check1.checked || !check2.checked) { erro = true; mensagensErro.push("Você deve aceitar os termos de confirmação e autorização."); }
+
+      if (erro) {
+        mostrarModal('error', 'Ops! Faltam informações', mensagensErro.join("<br>"));
+        return;
+      }
+
+      const btnEnviar = document.getElementById('btnEnviar');
+      const btnEnviar2 = document.getElementById('btnEnviar2');
+      btnEnviar.disabled = true;
+      btnEnviar2.disabled = true;
+      btnEnviar.innerHTML = 'Enviando... <span class="loading"></span>';
+      btnEnviar2.innerHTML = 'Enviando... <span class="loading"></span>';
+
+      const dados = coletarDados();
+
+      try {
+        // Envio direto para a Edge Function (Supabase). Ela valida o token e chama o n8n apenas no SUBMIT.
+        const response = await fetch('https://obbdfoijktcftywvwwri.supabase.co/functions/v1/ia-onboarding-submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ onboarding_token, salao_id, ...dados })
+        });
+
+        if (response.ok) {
+          mostrarModal('success', 'Sucesso!', 'Seu formulário foi enviado com sucesso. Em breve sua ELISA estará configurada e pronta para atender seus clientes!');
+        } else {
+          throw new Error('Erro ao enviar formulário');
+        }
+      } catch (error) {
+        console.error('Erro:', error);
+        mostrarModal('error', 'Erro ao enviar', 'Ocorreu um erro ao enviar o formulário. Por favor, tente novamente ou entre em contato conosco.');
+      } finally {
+        btnEnviar.disabled = false;
+        btnEnviar2.disabled = false;
+        btnEnviar.innerHTML = '📤 Enviar Formulário';
+        btnEnviar2.innerHTML = '📤 Enviar Formulário';
+      }
+    }
+
+    function mostrarModal(tipo, titulo, mensagem) {
+      const modal = document.getElementById('modal');
+      const modalContent = document.getElementById('modalContent');
+      const modalIcon = document.getElementById('modalIcon');
+      const modalTitle = document.getElementById('modalTitle');
+      const modalMessage = document.getElementById('modalMessage');
+
+      modalContent.className = 'modal-content ' + tipo;
+      modalIcon.textContent = tipo === 'success' ? '✅' : '❌';
+      modalTitle.textContent = titulo;
+      modalMessage.innerHTML = mensagem.replace(/\n/g, '<br>');
+      modal.classList.add('active');
+    }
+
+    function fecharModal() {
+      document.getElementById('modal').classList.remove('active');
+    }
+
+    document.getElementById('modal').addEventListener('click', function(e) {
+      if (e.target === this) fecharModal();
+    });
+  </script>
+</body>
+</html>
