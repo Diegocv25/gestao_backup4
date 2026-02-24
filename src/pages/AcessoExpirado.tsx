@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/auth/auth-context";
 
-const PLANS_URL_FALLBACK = "https://gestaobackup4.vercel.app";
+const PLANS_URL_FALLBACK = "https://pay.kiwify.com.br/H5429N1";
 const PLANS_URL = (import.meta.env.VITE_PLANS_URL || PLANS_URL_FALLBACK).replace(/\/+$/, "");
 
 export default function AcessoExpirado() {
