@@ -9,6 +9,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "@/auth/auth-context";
 import { AuthGate } from "@/auth/AuthGate";
 import { AccessProvider } from "@/auth/access-context";
+import { SubscriptionGate } from "@/auth/SubscriptionGate";
 import { RoleGate } from "@/auth/RoleGate";
 import { PortalGate } from "@/auth/PortalGate";
 import { BackofficeGate } from "@/auth/BackofficeGate";
@@ -26,6 +27,7 @@ import RelatoriosPage from "./pages/Relatorios";
 import ProdutosPage from "./pages/Produtos";
 import ConfiguracoesPage from "./pages/Configuracoes";
 import ConfiguracoesIAPage from "./pages/ConfiguracoesIA";
+import AcessoExpiradoPage from "./pages/AcessoExpirado";
 import ClientePublicoPage from "./pages/ClientePublico";
 import ClientePortalAppPage from "./pages/ClientePortalApp";
 import ClientePortalMeusAgendamentosPage from "./pages/ClientePortalMeusAgendamentos";
@@ -78,8 +80,11 @@ const App = () => (
 
               <Route element={<AuthGate />}>
                 <Route element={<BackofficeGate />}>
-                  <Route element={<AppLayout />}>
-                  {/* Profissional */}
+                  <Route path="/acesso-expirado" element={<AcessoExpiradoPage />} />
+
+                  <Route element={<SubscriptionGate />}>
+                    <Route element={<AppLayout />}>
+                    {/* Profissional */}
                   <Route element={<RoleGate allowed={["profissional"]} />}>
                     <Route path="/profissional/agendamentos" element={<ProfissionalAgendamentosPage />} />
                     <Route path="/profissional/agendamentos/novo" element={<ProfissionalAgendamentoFormPage />} />
@@ -119,6 +124,7 @@ const App = () => (
 
                     <Route path="/relatorios" element={<RelatoriosPage />} />
                   </Route>
+                    </Route>
                   </Route>
                 </Route>
               </Route>
