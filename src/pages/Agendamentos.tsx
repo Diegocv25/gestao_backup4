@@ -93,6 +93,10 @@ export default function AgendamentosPage() {
   const [pagamentoForma, setPagamentoForma] = useState<FormaPagamento | "">("");
   const [pagamentoAgendamento, setPagamentoAgendamento] = useState<any | null>(null);
 
+  const [comissaoOpen, setComissaoOpen] = useState(false);
+  const [comissaoForma, setComissaoForma] = useState<FormaPagamento | "">("");
+  const [comissaoAgendamento, setComissaoAgendamento] = useState<any | null>(null);
+
   const salaoTokenQuery = useQuery({
     queryKey: ["salao-public-booking", salaoId],
     enabled: !!salaoId,
@@ -233,14 +237,18 @@ export default function AgendamentosPage() {
   });
 
   const marcarComissaoPagaMutation = useMutation({
-    mutationFn: async (vars: { agendamentoId: string }) => {
+    mutationFn: async (vars: { agendamentoId: string; forma: FormaPagamento }) => {
+      if (!vars.forma) throw new Error("Informe a forma de pagamento da comissão");
       const { error } = await supabase
         .from("comissoes")
-        .update({ pago_em: new Date().toISOString() })
+        .update({ pago_em: new Date().toISOString(), forma_pagamento: vars.forma })
         .eq("agendamento_id", vars.agendamentoId);
       if (error) throw error;
     },
     onSuccess: async () => {
+      setComissaoOpen(false);
+      setComissaoForma("");
+      setComissaoAgendamento(null);
       await qc.invalidateQueries({ queryKey: ["agendamentos"] });
       await qc.invalidateQueries({ queryKey: ["dashboard"] });
       await qc.invalidateQueries({ queryKey: ["relatorios"] });
@@ -414,6 +422,84 @@ export default function AgendamentosPage() {
                 disabled={!pagamentoAgendamento || !pagamentoForma || concluirComPagamentoMutation.isPending}
               >
                 {concluirComPagamentoMutation.isPending ? "Salvando…" : "Concluir"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={comissaoOpen}
+        onOpenChange={(o) => {
+          if (!o) {
+            setComissaoOpen(false);
+            setComissaoForma("");
+            setComissaoAgendamento(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Pagamento da comissão</DialogTitle>
+            <DialogDescription>
+              Para marcar a comissão como paga, informe a forma de pagamento (Pix, Dinheiro ou Cartão).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <div className="text-sm font-medium">
+                {comissaoAgendamento
+                  ? `${format(parseISO(String(comissaoAgendamento.data_hora_inicio)), "dd/MM/yyyy HH:mm")} • ${(comissaoAgendamento.funcionario as any)?.nome ?? "Profissional"}`
+                  : "Comissão"}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Use a forma de pagamento para registrar corretamente nos relatórios.
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Forma</Label>
+              <Select value={comissaoForma} onValueChange={(v) => setComissaoForma(v as FormaPagamento)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(formaPagamentoLabel) as FormaPagamento[]).map((k) => (
+                    <SelectItem key={k} value={k}>
+                      {formaPagamentoLabel[k]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setComissaoOpen(false);
+                  setComissaoForma("");
+                  setComissaoAgendamento(null);
+                }}
+                disabled={marcarComissaoPagaMutation.isPending}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  if (!comissaoAgendamento) return;
+                  if (!comissaoForma) return;
+                  marcarComissaoPagaMutation.mutate({
+                    agendamentoId: String(comissaoAgendamento.id),
+                    forma: comissaoForma as FormaPagamento,
+                  });
+                }}
+                disabled={!comissaoAgendamento || !comissaoForma || marcarComissaoPagaMutation.isPending}
+              >
+                {marcarComissaoPagaMutation.isPending ? "Salvando…" : "Marcar como paga"}
               </Button>
             </div>
           </div>
@@ -611,7 +697,11 @@ export default function AgendamentosPage() {
                               <DropdownMenuLabel>Comissão</DropdownMenuLabel>
                               <DropdownMenuItem
                                 disabled={marcarComissaoPagaMutation.isPending}
-                                onClick={() => marcarComissaoPagaMutation.mutate({ agendamentoId: String(a.id) })}
+                                onClick={() => {
+                                  setComissaoAgendamento(a);
+                                  setComissaoForma(pagamentoFormaRow ?? "");
+                                  setComissaoOpen(true);
+                                }}
                               >
                                 Marcar comissão como paga
                               </DropdownMenuItem>
