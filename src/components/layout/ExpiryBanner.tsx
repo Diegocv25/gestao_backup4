@@ -43,7 +43,7 @@ export function ExpiryBanner() {
 
   const cadastroQuery = useQuery({
     queryKey: ["cadastro-estabelecimento", user?.id],
-    enabled: !!user?.id && (role === "admin" || role === "gerente"),
+    enabled: !!user?.id && role === "admin",
     staleTime: 1000 * 60 * 5,
     queryFn: async () => {
       const { data, error } = await (supabase as any)
@@ -69,7 +69,7 @@ export function ExpiryBanner() {
 
   // Condições de exibição
   if (!user) return null;
-  if (!(role === "admin" || role === "gerente")) return null;
+  if (role !== "admin") return null;
 
   // Se há assinatura ativa (automática), não exibe aviso de cobrança.
   const subStatus = String(subscriptionQuery.data?.status ?? "");
