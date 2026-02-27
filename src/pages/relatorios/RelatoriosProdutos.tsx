@@ -93,9 +93,38 @@
          .gte("created_at", `${inicio}T00:00:00`)
          .lte("created_at", `${fim}T23:59:59`)
          .order("created_at", { ascending: false });
- 
+
        if (error) throw error;
-       return data as Venda[];
+
+       const vendas = (data as Venda[]) || [];
+       const ids = vendas.map((v) => v.id);
+       if (ids.length === 0) return vendas;
+
+       // Busca recebimentos por venda para exibir pagamento dividido corretamente
+       const { data: recData, error: recErr } = await supabase
+         .from("recebimentos")
+         .select("venda_produto_id, forma, valor")
+         .eq("salao_id", salaoId)
+         .in("venda_produto_id", ids);
+       if (recErr) throw recErr;
+
+       const map = new Map<string, Array<{ forma: string; valor: number }>>();
+       for (const r of recData || []) {
+         const k = String((r as any).venda_produto_id);
+         const arr = map.get(k) || [];
+         arr.push({ forma: String((r as any).forma), valor: Number((r as any).valor ?? 0) });
+         map.set(k, arr);
+       }
+
+       return vendas.map((v) => {
+         const parts = map.get(String(v.id)) || [];
+         if (parts.length <= 1) return v;
+         const formas = Array.from(new Set(parts.map((p) => p.forma)));
+         return {
+           ...v,
+           forma_pagamento: formas.join(" + "),
+         };
+       });
      },
      enabled: !!salaoId,
    });

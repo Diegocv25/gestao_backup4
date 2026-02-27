@@ -55,16 +55,10 @@ export default function RelatoriosFluxoCaixa({ inicio, fim }: { inicio: string; 
     queryKey: ["relatorios", "fluxo_caixa", { salaoId, inicio, fim }],
     enabled: !!salaoId && !!inicio && !!fim,
     queryFn: async () => {
-      const [rec, vendas, comissoesPagas, despesasPagas, salariosPagos] = await Promise.all([
+      const [rec, comissoesPagas, despesasPagas, salariosPagos] = await Promise.all([
         supabase
           .from("recebimentos")
           .select("forma,valor,created_at")
-          .eq("salao_id", salaoId as string)
-          .gte("created_at", inicioDate.toISOString())
-          .lt("created_at", fimDateExclusivo.toISOString()),
-        supabase
-          .from("vendas_produtos")
-          .select("forma_pagamento,total_venda,created_at")
           .eq("salao_id", salaoId as string)
           .gte("created_at", inicioDate.toISOString())
           .lt("created_at", fimDateExclusivo.toISOString()),
@@ -94,7 +88,6 @@ export default function RelatoriosFluxoCaixa({ inicio, fim }: { inicio: string; 
       ]);
 
       if (rec.error) throw rec.error;
-      if (vendas.error) throw vendas.error;
       if (comissoesPagas.error) throw comissoesPagas.error;
       if (despesasPagas.error) throw despesasPagas.error;
       if (salariosPagos.error) throw salariosPagos.error;
@@ -104,23 +97,15 @@ export default function RelatoriosFluxoCaixa({ inicio, fim }: { inicio: string; 
         valor: safeNumber(r.valor),
       }));
 
-      const vendasProdutos = (vendas.data ?? []).map((r: any) => ({
-        forma: normalizeForma(r.forma_pagamento),
-        valor: safeNumber(r.total_venda),
-      }));
-
       const sumReceb = sumByForma(recebimentos);
-      const sumVend = sumByForma(vendasProdutos);
 
-      const totalReceb = Object.values(sumReceb).reduce((a, b) => a + safeNumber(b), 0);
-      const totalVend = Object.values(sumVend).reduce((a, b) => a + safeNumber(b), 0);
-      const totalGeral = totalReceb + totalVend;
+      const totalGeral = Object.values(sumReceb).reduce((a, b) => a + safeNumber(b), 0);
 
       const porForma: Record<FormaPagamento, number> = {
-        pix: sumReceb.pix + sumVend.pix,
-        dinheiro: sumReceb.dinheiro + sumVend.dinheiro,
-        cartao: sumReceb.cartao + sumVend.cartao,
-        nao_informado: sumReceb.nao_informado + sumVend.nao_informado,
+        pix: sumReceb.pix,
+        dinheiro: sumReceb.dinheiro,
+        cartao: sumReceb.cartao,
+        nao_informado: sumReceb.nao_informado,
       };
 
       const retiradasComissoes = (comissoesPagas.data ?? []).map((r: any) => ({
@@ -152,8 +137,8 @@ export default function RelatoriosFluxoCaixa({ inicio, fim }: { inicio: string; 
       const totalRetiradas = Object.values(retiradasPorForma).reduce((a, b) => a + safeNumber(b), 0);
 
       return {
-        recebimentos: { ...sumReceb, total: totalReceb },
-        vendasProdutos: { ...sumVend, total: totalVend },
+        recebimentos: { ...sumReceb, total: totalGeral },
+        vendasProdutos: { pix: 0, dinheiro: 0, cartao: 0, nao_informado: 0, total: 0 },
         porForma,
         totalGeral,
         retiradas: {

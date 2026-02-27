@@ -17,6 +17,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
    funcionario_id: string;
    cliente_nome: string;
    forma_pagamento: string;
+   pagamento_dividido?: boolean;
+   forma_pagamento2?: string;
+   valor1?: string;
+   valor2?: string;
  }
  
  export function ProdutosVendas() {
@@ -72,23 +76,71 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
        const comissaoFuncionario = quantidade * Number(produto.comissao_valor_fixo ?? 0);
  
        // Registra venda
-       const { error: vendaError } = await supabase.from("vendas_produtos").insert([
-         {
-           salao_id: salaoId,
-           produto_id: row.produto_id,
-           quantidade,
-           preco_unitario: precoUnitario,
-           total_venda: totalVenda,
-           custo_unitario: produto.custo_medio,
-           total_custo: totalCusto,
-           lucro_bruto: lucroBruto,
-           comissao_funcionario: comissaoFuncionario,
-           funcionario_id: row.funcionario_id,
-           forma_pagamento: row.forma_pagamento || null,
-           cliente_nome: row.cliente_nome || null,
-         },
-       ]);
+       const { data: vendaData, error: vendaError } = await supabase
+         .from("vendas_produtos")
+         .insert([
+           {
+             salao_id: salaoId,
+             produto_id: row.produto_id,
+             quantidade,
+             preco_unitario: precoUnitario,
+             total_venda: totalVenda,
+             custo_unitario: produto.custo_medio,
+             total_custo: totalCusto,
+             lucro_bruto: lucroBruto,
+             comissao_funcionario: comissaoFuncionario,
+             funcionario_id: row.funcionario_id,
+             // mantém por compatibilidade/visualização; o fluxo de caixa usa recebimentos
+             forma_pagamento: row.forma_pagamento || null,
+             cliente_nome: row.cliente_nome || null,
+           },
+         ])
+         .select("id")
+         .single();
        if (vendaError) throw vendaError;
+
+       const vendaId = vendaData?.id;
+       if (!vendaId) throw new Error("Não foi possível obter o ID da venda");
+
+       // Recebimentos (permite pagamento dividido)
+       const pagamentoDividido = !!row.pagamento_dividido;
+
+       if (!row.forma_pagamento) throw new Error("Informe a forma de pagamento");
+
+       if (!pagamentoDividido) {
+         const { error: recErr } = await supabase.from("recebimentos").insert([
+           {
+             salao_id: salaoId,
+             venda_produto_id: vendaId,
+             forma: row.forma_pagamento,
+             valor: totalVenda,
+           },
+         ]);
+         if (recErr) throw recErr;
+       } else {
+         if (!row.forma_pagamento2) throw new Error("Informe a segunda forma de pagamento");
+         const v1 = Number(String(row.valor1 || "0").replace(",", "."));
+         const v2 = Number(String(row.valor2 || "0").replace(",", "."));
+         if (Math.abs(v1 + v2 - totalVenda) > 0.01) {
+           throw new Error("A soma do pagamento dividido precisa bater com o total da venda");
+         }
+
+         const { error: recErr } = await supabase.from("recebimentos").insert([
+           {
+             salao_id: salaoId,
+             venda_produto_id: vendaId,
+             forma: row.forma_pagamento,
+             valor: v1,
+           },
+           {
+             salao_id: salaoId,
+             venda_produto_id: vendaId,
+             forma: row.forma_pagamento2,
+             valor: v2,
+           },
+         ]);
+         if (recErr) throw recErr;
+       }
  
        // Registra movimentação
        const { error: movError } = await supabase.from("movimentacoes_estoque").insert([
@@ -129,6 +181,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
          funcionario_id: "",
          cliente_nome: "",
          forma_pagamento: "",
+         pagamento_dividido: false,
+         forma_pagamento2: "",
+         valor1: "",
+         valor2: "",
        },
      ]);
    }
@@ -151,6 +207,23 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
              const produto = produtosQuery.data?.find((p) => p.id === value);
              if (produto && !r.preco_unitario) {
                updated.preco_unitario = String(produto.preco_venda);
+             }
+           }
+           // Quando marcar pagamento dividido, sugerir valores
+           if (field === "pagamento_dividido") {
+             const on = value === "true";
+             updated.pagamento_dividido = on;
+             if (on) {
+               const quantidade = Number(updated.quantidade || 0);
+               const precoUnitario = Number(updated.preco_unitario || 0);
+               const total = quantidade * precoUnitario;
+               updated.valor1 = total ? total.toFixed(2) : "";
+               updated.valor2 = "0.00";
+               updated.forma_pagamento2 = "";
+             } else {
+               updated.valor1 = "";
+               updated.valor2 = "";
+               updated.forma_pagamento2 = "";
              }
            }
            return updated;
@@ -262,6 +335,43 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
                  </SelectContent>
                </Select>
              </div>
+
+             <div className="flex items-center gap-2 sm:col-span-2">
+               <input
+                 type="checkbox"
+                 checked={!!row.pagamento_dividido}
+                 onChange={(e) => updateRow(row.id, "pagamento_dividido", e.target.checked ? "true" : "false")}
+               />
+               <label className="text-xs text-muted-foreground">Dividido</label>
+             </div>
+
+             {row.pagamento_dividido ? (
+               <>
+                 <div className="space-y-1 sm:col-span-2">
+                   <label className="text-xs text-muted-foreground">Valor 1</label>
+                   <Input value={row.valor1 || ""} onChange={(e) => updateRow(row.id, "valor1", e.target.value)} />
+                 </div>
+
+                 <div className="space-y-1 sm:col-span-1">
+                   <label className="text-xs text-muted-foreground">Forma 2</label>
+                   <Select value={row.forma_pagamento2 || ""} onValueChange={(v) => updateRow(row.id, "forma_pagamento2", v)}>
+                     <SelectTrigger>
+                       <SelectValue placeholder="—" />
+                     </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                       <SelectItem value="pix">PIX</SelectItem>
+                       <SelectItem value="cartao">Cartão</SelectItem>
+                     </SelectContent>
+                   </Select>
+                 </div>
+
+                 <div className="space-y-1 sm:col-span-2">
+                   <label className="text-xs text-muted-foreground">Valor 2</label>
+                   <Input value={row.valor2 || ""} onChange={(e) => updateRow(row.id, "valor2", e.target.value)} />
+                 </div>
+               </>
+             ) : null}
  
              <div className="flex gap-2 sm:col-span-2">
                <Button size="sm" onClick={() => saveRow(row)} disabled={saveMutation.isPending}>
