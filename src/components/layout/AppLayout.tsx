@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { AppSidebar } from "@/components/layout/AppSidebar";
+import { ExpiryBanner } from "@/components/layout/ExpiryBanner";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
@@ -81,14 +82,17 @@ export function AppLayout() {
         <AppSidebar />
 
         <div className="relative z-10 flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-20 flex h-12 items-center justify-between border-b bg-background/80 px-3 backdrop-blur">
-            <div className="flex items-center gap-2">
-              <SidebarTrigger />
-              <div className="text-sm font-medium">{headerTitle}</div>
+          <header className="sticky top-0 z-20 border-b bg-background/80 px-3 backdrop-blur">
+            <div className="flex h-12 items-center justify-between">
+              <div className="flex items-center gap-2">
+                <SidebarTrigger />
+                <div className="text-sm font-medium">{headerTitle}</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <ThemeToggle />
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <ThemeToggle />
-            </div>
+            <ExpiryBanner />
           </header>
 
           <main className="flex-1 min-h-0 overflow-auto p-6">
