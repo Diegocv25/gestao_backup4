@@ -92,6 +92,10 @@ export default function AgendamentosPage() {
   const [pagamentoOpen, setPagamentoOpen] = useState(false);
   const [pagamentoForma, setPagamentoForma] = useState<FormaPagamento | "">("");
   const [pagamentoAgendamento, setPagamentoAgendamento] = useState<any | null>(null);
+  const [pagamentoDividido, setPagamentoDividido] = useState(false);
+  const [pagamentoForma2, setPagamentoForma2] = useState<FormaPagamento | "">("");
+  const [pagamentoValor1, setPagamentoValor1] = useState<string>("");
+  const [pagamentoValor2, setPagamentoValor2] = useState<string>("");
 
   const [comissaoOpen, setComissaoOpen] = useState(false);
   const [comissaoForma, setComissaoForma] = useState<FormaPagamento | "">("");
@@ -200,35 +204,39 @@ export default function AgendamentosPage() {
   });
 
   const concluirComPagamentoMutation = useMutation({
-    mutationFn: async (vars: { agendamentoId: string; forma: FormaPagamento; valor: number }) => {
+    mutationFn: async (vars: { agendamentoId: string; partes: Array<{ forma: FormaPagamento; valor: number }> }) => {
       if (!salaoId) throw new Error("Salão não cadastrado");
 
       const sb = supabase as any;
 
-      // 1) Cria/atualiza recebimento primeiro (assim, se falhar, não muda status)
-      const { error: recErr } = await sb
-        .from("recebimentos")
-        .upsert(
-          {
-            salao_id: salaoId,
-            agendamento_id: vars.agendamentoId,
-            forma: vars.forma,
-            valor: vars.valor,
-          },
-          { onConflict: "agendamento_id" },
-        );
-      if (recErr) throw recErr;
+      // 1) Remove recebimentos existentes do agendamento (permite reprocessar / corrigir)
+      const { error: delErr } = await sb.from("recebimentos").delete().eq("agendamento_id", vars.agendamentoId);
+      if (delErr) throw delErr;
 
-      // 2) Marca como concluído
-      const { error: stErr } = await supabase
-        .from("agendamentos")
-        .update({ status: "concluido" })
-        .eq("id", vars.agendamentoId);
+      // 2) Insere as partes do recebimento (pagamento único ou dividido)
+      const payload = (vars.partes ?? []).map((p) => ({
+        salao_id: salaoId,
+        agendamento_id: vars.agendamentoId,
+        forma: p.forma,
+        valor: p.valor,
+      }));
+
+      if (payload.length === 0) throw new Error("Informe a forma de pagamento");
+
+      const { error: insErr } = await sb.from("recebimentos").insert(payload);
+      if (insErr) throw insErr;
+
+      // 3) Marca como concluído
+      const { error: stErr } = await sb.from("agendamentos").update({ status: "concluido" }).eq("id", vars.agendamentoId);
       if (stErr) throw stErr;
     },
     onSuccess: async () => {
       setPagamentoOpen(false);
       setPagamentoForma("");
+      setPagamentoForma2("");
+      setPagamentoDividido(false);
+      setPagamentoValor1("");
+      setPagamentoValor2("");
       setPagamentoAgendamento(null);
       await qc.invalidateQueries({ queryKey: ["agendamentos"] });
       await qc.invalidateQueries({ queryKey: ["dashboard"] });
@@ -395,6 +403,73 @@ export default function AgendamentosPage() {
               </Select>
             </div>
 
+            <div className="flex items-center gap-2">
+              <input
+                id="pagamento_dividido"
+                type="checkbox"
+                checked={pagamentoDividido}
+                onChange={(e) => {
+                  const on = e.target.checked;
+                  setPagamentoDividido(on);
+                  if (on) {
+                    const total = pagamentoAgendamento ? Number(pagamentoAgendamento.total_valor ?? 0) : 0;
+                    setPagamentoValor1(total ? total.toFixed(2) : "");
+                    setPagamentoValor2("0.00");
+                    setPagamentoForma2("");
+                  } else {
+                    setPagamentoForma2("");
+                    setPagamentoValor1("");
+                    setPagamentoValor2("");
+                  }
+                }}
+              />
+              <Label htmlFor="pagamento_dividido">Pagamento dividido</Label>
+            </div>
+
+            {pagamentoDividido ? (
+              <div className="grid gap-3 rounded-md border p-3">
+                <div className="grid gap-2">
+                  <Label>Parte 1 — valor</Label>
+                  <Input
+                    value={pagamentoValor1}
+                    onChange={(e) => setPagamentoValor1(e.target.value)}
+                    inputMode="decimal"
+                    placeholder="0,00"
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label>Parte 2 — forma</Label>
+                  <Select value={pagamentoForma2} onValueChange={(v) => setPagamentoForma2(v as FormaPagamento)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(formaPagamentoLabel) as FormaPagamento[]).map((k) => (
+                        <SelectItem key={k} value={k}>
+                          {formaPagamentoLabel[k]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label>Parte 2 — valor</Label>
+                  <Input
+                    value={pagamentoValor2}
+                    onChange={(e) => setPagamentoValor2(e.target.value)}
+                    inputMode="decimal"
+                    placeholder="0,00"
+                  />
+                </div>
+
+                <div className="text-xs text-muted-foreground">
+                  A soma das partes precisa bater com o total do agendamento.
+                </div>
+              </div>
+            ) : null}
+
             <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
               <Button
                 type="button"
@@ -413,13 +488,39 @@ export default function AgendamentosPage() {
                 onClick={() => {
                   if (!pagamentoAgendamento) return;
                   if (!pagamentoForma) return;
+
+                  const total = Number(pagamentoAgendamento.total_valor ?? 0);
+
+                  if (!pagamentoDividido) {
+                    concluirComPagamentoMutation.mutate({
+                      agendamentoId: String(pagamentoAgendamento.id),
+                      partes: [{ forma: pagamentoForma as FormaPagamento, valor: total }],
+                    });
+                    return;
+                  }
+
+                  // dividido
+                  const v1 = Number(String(pagamentoValor1 || "0").replace(",", "."));
+                  const v2 = Number(String(pagamentoValor2 || "0").replace(",", "."));
+                  if (!pagamentoForma2) return;
+
+                  // tolerância 1 centavo
+                  if (Math.abs(v1 + v2 - total) > 0.01) return;
+
                   concluirComPagamentoMutation.mutate({
                     agendamentoId: String(pagamentoAgendamento.id),
-                    forma: pagamentoForma as FormaPagamento,
-                    valor: Number(pagamentoAgendamento.total_valor ?? 0),
+                    partes: [
+                      { forma: pagamentoForma as FormaPagamento, valor: v1 },
+                      { forma: pagamentoForma2 as FormaPagamento, valor: v2 },
+                    ],
                   });
                 }}
-                disabled={!pagamentoAgendamento || !pagamentoForma || concluirComPagamentoMutation.isPending}
+                disabled={
+                  !pagamentoAgendamento ||
+                  !pagamentoForma ||
+                  concluirComPagamentoMutation.isPending ||
+                  (pagamentoDividido && (!pagamentoForma2 || !pagamentoValor1 || !pagamentoValor2))
+                }
               >
                 {concluirComPagamentoMutation.isPending ? "Salvando…" : "Concluir"}
               </Button>
