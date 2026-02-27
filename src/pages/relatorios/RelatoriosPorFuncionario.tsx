@@ -332,7 +332,7 @@ export default function RelatoriosPorFuncionario({ inicio, fim }: { inicio: stri
                 <TableHead className="text-right">Comissão serv. pendente</TableHead>
                 <TableHead className="text-right">Comissão produtos</TableHead>
                 <TableHead className="text-right">Receita bruta</TableHead>
-                <TableHead className="text-right">Renda p/ salão</TableHead>
+                <TableHead className="text-right">Renda p/ estabelecimento</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
