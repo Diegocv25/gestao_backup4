@@ -7,10 +7,17 @@ import { useSalaoId } from "@/hooks/useSalaoId";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
- import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
- import { Button } from "@/components/ui/button";
- import { Badge } from "@/components/ui/badge";
- import { useToast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 
 import { formatBRL, safeNumber, toFimDateExclusivo, toInicioDate } from "@/pages/relatorios/relatorios-utils";
 
@@ -25,10 +32,21 @@ type Row = {
   rendaSalao: number;
 };
 
+type FormaPagamento = "pix" | "dinheiro" | "cartao";
+const formaPagamentoLabel: Record<FormaPagamento, string> = {
+  pix: "Pix",
+  dinheiro: "Dinheiro",
+  cartao: "Cartão",
+};
+
 export default function RelatoriosPorFuncionario({ inicio, fim }: { inicio: string; fim: string }) {
   const { data: salaoId } = useSalaoId();
   const inicioDate = useMemo(() => toInicioDate(inicio), [inicio]);
   const fimDateExclusivo = useMemo(() => toFimDateExclusivo(fim), [fim]);
+
+  const [comissaoPagarOpen, setComissaoPagarOpen] = useState(false);
+  const [comissaoPagarId, setComissaoPagarId] = useState<string | null>(null);
+  const [comissaoForma, setComissaoForma] = useState<FormaPagamento | "">("");
 
   const porFuncionarioQuery = useQuery({
     queryKey: ["relatorios", "por_funcionario", { salaoId, inicio, fim }],
@@ -201,15 +219,19 @@ export default function RelatoriosPorFuncionario({ inicio, fim }: { inicio: stri
 
    // Mutation para marcar comissão como paga
    const marcarComoPagoMutation = useMutation({
-     mutationFn: async (comissaoId: string) => {
+     mutationFn: async (vars: { comissaoId: string; forma: FormaPagamento }) => {
+       if (!vars.forma) throw new Error("forma_pagamento é obrigatória");
        const { error } = await supabase
          .from("comissoes")
-         .update({ pago_em: new Date().toISOString() })
-         .eq("id", comissaoId);
-       
+         .update({ pago_em: new Date().toISOString(), forma_pagamento: vars.forma })
+         .eq("id", vars.comissaoId);
+
        if (error) throw error;
      },
      onSuccess: () => {
+       setComissaoPagarOpen(false);
+       setComissaoPagarId(null);
+       setComissaoForma("");
        toast({
          title: "Comissão marcada como paga",
          description: "O pagamento foi registrado com sucesso.",
@@ -228,6 +250,70 @@ export default function RelatoriosPorFuncionario({ inicio, fim }: { inicio: stri
 
   return (
     <section className="space-y-6">
+      <Dialog
+        open={comissaoPagarOpen}
+        onOpenChange={(o) => {
+          if (!o) {
+            setComissaoPagarOpen(false);
+            setComissaoPagarId(null);
+            setComissaoForma("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Pagamento da comissão</DialogTitle>
+            <DialogDescription>
+              Para marcar como pago, informe a forma de pagamento (Pix, Dinheiro ou Cartão).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Forma</label>
+              <Select value={comissaoForma} onValueChange={(v) => setComissaoForma(v as FormaPagamento)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(formaPagamentoLabel) as FormaPagamento[]).map((k) => (
+                    <SelectItem key={k} value={k}>
+                      {formaPagamentoLabel[k]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setComissaoPagarOpen(false);
+                  setComissaoPagarId(null);
+                  setComissaoForma("");
+                }}
+                disabled={marcarComoPagoMutation.isPending}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  if (!comissaoPagarId) return;
+                  if (!comissaoForma) return;
+                  marcarComoPagoMutation.mutate({ comissaoId: comissaoPagarId, forma: comissaoForma as FormaPagamento });
+                }}
+                disabled={!comissaoPagarId || !comissaoForma || marcarComoPagoMutation.isPending}
+              >
+                {marcarComoPagoMutation.isPending ? "Salvando…" : "Marcar como pago"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Comparativo por funcionário (período)</CardTitle>
@@ -346,7 +432,11 @@ export default function RelatoriosPorFuncionario({ inicio, fim }: { inicio: stri
                           <TableCell className="text-right">
                             <Button
                               size="sm"
-                              onClick={() => marcarComoPagoMutation.mutate(comissao.id)}
+                              onClick={() => {
+                                setComissaoPagarId(String(comissao.id));
+                                setComissaoForma("");
+                                setComissaoPagarOpen(true);
+                              }}
                               disabled={marcarComoPagoMutation.isPending}
                             >
                               Marcar como pago
