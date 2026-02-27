@@ -23,6 +23,8 @@ type AvisosForm = {
   sex: string;
   sab: string;
   dom: string;
+  aniversario_ativo: boolean;
+  aniversario_mensagem: string;
 };
 
 const dias = [
@@ -51,6 +53,8 @@ const formSchema = z.object({
   sex: avisoSchema,
   sab: avisoSchema,
   dom: avisoSchema,
+  aniversario_ativo: z.boolean().optional(),
+  aniversario_mensagem: z.string().trim().max(1000, "Use no máximo 1000 caracteres").optional(),
 });
 
 export function AvisosSemanaisCard({ salaoId }: { salaoId: string | null | undefined }) {
@@ -62,7 +66,7 @@ export function AvisosSemanaisCard({ salaoId }: { salaoId: string | null | undef
     queryFn: async () => {
       const { data, error } = await supabase
         .from("avisos_semanais")
-        .select("id,geral,seg,ter,qua,qui,sex,sab,dom")
+        .select("id,geral,seg,ter,qua,qui,sex,sab,dom,aniversario_ativo,aniversario_mensagem")
         .eq("salao_id", salaoId as string)
         .order("created_at", { ascending: true })
         .limit(1)
@@ -84,6 +88,8 @@ export function AvisosSemanaisCard({ salaoId }: { salaoId: string | null | undef
       sex: "",
       sab: "",
       dom: "",
+      aniversario_ativo: false,
+      aniversario_mensagem: "",
     };
   }, [salaoId]);
 
@@ -108,6 +114,8 @@ export function AvisosSemanaisCard({ salaoId }: { salaoId: string | null | undef
       sex: row.sex ?? "",
       sab: row.sab ?? "",
       dom: row.dom ?? "",
+      aniversario_ativo: !!row.aniversario_ativo,
+      aniversario_mensagem: row.aniversario_mensagem ?? "",
     });
   }, [salaoId, avisosQuery.data, avisosQuery.isLoading, empty]);
 
@@ -128,6 +136,8 @@ export function AvisosSemanaisCard({ salaoId }: { salaoId: string | null | undef
         sex: parsed.data.sex || null,
         sab: parsed.data.sab || null,
         dom: parsed.data.dom || null,
+        aniversario_ativo: !!parsed.data.aniversario_ativo,
+        aniversario_mensagem: String(parsed.data.aniversario_mensagem ?? "").trim() || null,
       };
 
       const { data, error } = await supabase.from("avisos_semanais").upsert(payload).select("id");
@@ -170,6 +180,31 @@ export function AvisosSemanaisCard({ salaoId }: { salaoId: string | null | undef
                 placeholder="Ex: Promoção da semana / Informativo"
               />
               <div className="text-xs text-muted-foreground">Dica: mantenha curto (até 500 caracteres).</div>
+            </div>
+
+            <div className="rounded-md border p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium">Mensagem de aniversário</div>
+                  <div className="text-xs text-muted-foreground">
+                    Enviado automaticamente (n8n) no dia do aniversário do cliente.
+                  </div>
+                </div>
+                <Switch
+                  checked={!!form.aniversario_ativo}
+                  onCheckedChange={(v) => setForm((p) => (p ? { ...p, aniversario_ativo: !!v } : p))}
+                />
+              </div>
+
+              <div className="mt-3 grid gap-2">
+                <Label>Mensagem</Label>
+                <Textarea
+                  value={form.aniversario_mensagem}
+                  onChange={(e) => setForm((p) => (p ? { ...p, aniversario_mensagem: e.target.value } : p))}
+                  placeholder="Ex: O {estabelecimento} deseja um feliz aniversário, {nome}!"
+                />
+                <div className="text-xs text-muted-foreground">Variáveis: {'{nome}'} e {'{estabelecimento}'}.</div>
+              </div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
