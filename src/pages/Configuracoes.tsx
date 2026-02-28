@@ -712,7 +712,25 @@ export default function ConfiguracoesPage() {
             </CardContent>
           </Card>
 
-          <AvisosSemanaisCard salaoId={salaoQuery.data?.id} />
+          {currentPlanId === "pro_ia" ? (
+            <AvisosSemanaisCard salaoId={salaoQuery.data?.id} />
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Avisos semanais</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-muted-foreground">Esta função está disponível apenas no plano PRO + IA.</p>
+                <div>
+                  <Button asChild size="sm" variant="outline">
+                    <a href={checkoutUpgradePlan} target="_blank" rel="noreferrer">
+                      Fazer upgrade para PRO + IA
+                    </a>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </>
       ) : null}
 
