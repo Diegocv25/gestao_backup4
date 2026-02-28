@@ -48,7 +48,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Copy, Link2, MoreVertical, Pencil, RefreshCw, Trash2 } from "lucide-react";
+import { Copy, Link2, MoreVertical, Pencil, Trash2 } from "lucide-react";
 
 type StatusFilter = "todos" | "marcado" | "confirmado" | "concluido" | "cancelado";
 type FormaPagamento = "pix" | "dinheiro" | "cartao";
@@ -86,7 +86,6 @@ export default function AgendamentosPage() {
   const [status, setStatus] = useState<StatusFilter>("todos");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [regenOpen, setRegenOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
 
   const [pagamentoOpen, setPagamentoOpen] = useState(false);
@@ -122,26 +121,6 @@ export default function AgendamentosPage() {
     return `${window.location.origin}/cliente/${token}`;
   }, [salaoTokenQuery.data]);
 
-  const regenerateLinkMutation = useMutation({
-    mutationFn: async () => {
-      if (!salaoId) throw new Error("Salão não cadastrado");
-
-      const nextToken =
-        typeof crypto !== "undefined" && "randomUUID" in crypto
-          ? crypto.randomUUID()
-          : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-      const { error } = await supabase
-        .from("saloes")
-        .update({ public_booking_token: nextToken })
-        .eq("id", salaoId);
-      if (error) throw error;
-    },
-    onSuccess: async () => {
-      setRegenOpen(false);
-      await qc.invalidateQueries({ queryKey: ["salao-public-booking"] });
-    },
-  });
 
   const monthStart = startOfMonth(selectedDay);
   const monthEnd = endOfMonth(selectedDay);
@@ -347,10 +326,6 @@ export default function AgendamentosPage() {
               {copied ? "Copiado" : "Copiar link"}
             </Button>
 
-            <Button type="button" variant="secondary" disabled={!publicBookingLink} onClick={() => setRegenOpen(true)}>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Gerar novo link
-            </Button>
           </div>
 
           <Button onClick={() => nav(`/agendamentos/novo?date=${format(selectedDay, "yyyy-MM-dd")}`)}>Novo agendamento</Button>
@@ -642,42 +617,11 @@ export default function AgendamentosPage() {
                 {copied ? "Copiado" : "Copiar link"}
               </Button>
 
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={!publicBookingLink}
-                onClick={() => {
-                  setLinkOpen(false);
-                  setRegenOpen(true);
-                }}
-              >
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Gerar novo link
-              </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={regenOpen} onOpenChange={setRegenOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Gerar novo link público?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Isso vai invalidar o link atual. Use somente se você suspeitar que o link vazou ou quiser trocar.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={regenerateLinkMutation.isPending}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={regenerateLinkMutation.isPending}
-              onClick={() => regenerateLinkMutation.mutate()}
-            >
-              {regenerateLinkMutation.isPending ? "Gerando…" : "Gerar novo"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {!salaoId ? (
         <Card>
