@@ -307,6 +307,18 @@ export default function ConfiguracoesPage() {
       const salaoId = saved?.id ?? payload.salao.id;
       if (!salaoId) throw new Error("Falha ao salvar salão");
 
+      // Sincroniza os dados com o cadastro do estabelecimento
+      if (user?.id) {
+        await supabase
+          .from("cadastros_estabelecimento")
+          .update({
+            nome_estabelecimento: payload.salao.nome.trim(),
+            telefone: telefoneJid || null,
+            endereco: payload.salao.endereco?.trim() || null,
+          })
+          .eq("user_id", user.id);
+      }
+
       await ensureDias.mutateAsync(salaoId);
 
       // salva os dias de funcionamento (independente dos horários dos funcionários)
@@ -347,7 +359,7 @@ export default function ConfiguracoesPage() {
     const s = subscriptionQuery.data as any;
     const pid = String(s?.product_id ?? "").toLowerCase();
     const pname = String(s?.product_name ?? "").toLowerCase();
-    if (pid.includes("pro_ia") || pname.includes("pro") || pname.includes("ia")) return "pro_ia";
+    if (s?.product_id === "pro_ia") return "pro_ia";
     return "profissional";
   }, [subscriptionQuery.data]);
 
