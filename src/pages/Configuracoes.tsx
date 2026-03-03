@@ -71,6 +71,20 @@ function localPhoneToJid(v?: string | null) {
   return `55${s}@s.whatsapp.net`;
 }
 
+function sanitizeEvolutionInstanceName(input: string) {
+  // Evolution API: sem espaços/acentos/caracteres especiais
+  const base = String(input || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // remove acentos
+    .replace(/\s+/g, "_")
+    .replace(/[^a-zA-Z0-9_\-]/g, "")
+    .replace(/_+/g, "_")
+    .replace(/^[_\-]+|[_\-]+$/g, "")
+    .toLowerCase();
+
+  return base;
+}
+
 function defaultDia(salaoId: string, dia: number): DiaFuncionamentoForm {
   const fechado = dia === 0;
   return {
@@ -291,15 +305,20 @@ export default function ConfiguracoesPage() {
         throw new Error("Telefone inválido. Use o formato (DD) 999999999");
       }
 
+        const rawName = payload.salao.nome.trim();
+        const evolutionInstanceBase = sanitizeEvolutionInstanceName(rawName);
+        const evolutionInstanceName = evolutionInstanceBase ? `${evolutionInstanceBase}_${String(payload.salao.id || "").slice(0, 8)}` : null;
+
         const { data: saved, error } = await supabase
           .from("saloes")
           .upsert({
             id: payload.salao.id,
-            nome: payload.salao.nome.trim(),
+            nome: rawName,
             telefone: telefoneJid || null,
             endereco: payload.salao.endereco?.trim() || null,
             agendamento_antecedencia_modo: payload.salao.agendamento_antecedencia_modo,
             agendamento_antecedencia_horas: Math.max(0, Number(payload.salao.agendamento_antecedencia_horas ?? 0)),
+            evolution_instance_name: evolutionInstanceName,
           })
           .select("id")
           .maybeSingle();
@@ -312,7 +331,7 @@ export default function ConfiguracoesPage() {
         await supabase
           .from("cadastros_estabelecimento")
           .update({
-            nome_estabelecimento: payload.salao.nome.trim(),
+            nome_estabelecimento: rawName,
             telefone: telefoneJid || null,
             endereco: payload.salao.endereco?.trim() || null,
           })
