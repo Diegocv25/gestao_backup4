@@ -129,18 +129,14 @@ export function AppSidebar() {
                 <img
                   src={salaoLogoUrl}
                   alt={`Logo do estabelecimento ${salaoNome}`}
-                  className={isCollapsed ? "h-20 w-20 rounded-md object-contain" : "h-24 w-24 rounded-md object-contain flex-shrink-0"}
+                  className={isCollapsed ? "h-24 w-24 rounded-md object-contain" : "h-28 w-28 rounded-md object-contain flex-shrink-0"}
                   loading="lazy"
                 />
               ) : (
-                <div className={isCollapsed ? "h-20 w-20 rounded-md bg-sidebar-primary" : "h-24 w-24 rounded-md bg-sidebar-primary flex-shrink-0"} aria-hidden="true" />
+                <div className={isCollapsed ? "h-24 w-24 rounded-md bg-sidebar-primary" : "h-28 w-28 rounded-md bg-sidebar-primary flex-shrink-0"} aria-hidden="true" />
               )}
 
-              {!isCollapsed && (
-                <div className="leading-tight">
-                  <div className="text-base font-semibold text-sidebar-foreground">{salaoNome}</div>
-                </div>
-              )}
+              {/* Removido o nome do estabelecimento aqui para não duplicar (já aparece no topo da página) */}
             </div>
           </div>
         </div>
