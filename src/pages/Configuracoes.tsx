@@ -79,8 +79,7 @@ function sanitizeSalaoNomeForEvolution(input: string) {
     .replace(/\s+/g, "_")
     .replace(/[^a-zA-Z0-9_\-]/g, "")
     .replace(/_+/g, "_")
-    .replace(/^[_\-]+|[_\-]+$/g, "")
-    .toLowerCase();
+    .replace(/^[_\-]+|[_\-]+$/g, "");
 }
 
 function defaultDia(salaoId: string, dia: number): DiaFuncionamentoForm {
