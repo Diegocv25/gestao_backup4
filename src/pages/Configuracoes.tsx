@@ -71,6 +71,17 @@ function localPhoneToJid(v?: string | null) {
   return `55${s}@s.whatsapp.net`;
 }
 
+function sanitizeSalaoNomeForEvolution(input: string) {
+  // Evolution API: sem espaços/acentos/caracteres especiais
+  return String(input || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "_")
+    .replace(/[^a-zA-Z0-9_\-]/g, "")
+    .replace(/_+/g, "_")
+    .replace(/^[_\-]+|[_\-]+$/g, "");
+}
+
 function defaultDia(salaoId: string, dia: number): DiaFuncionamentoForm {
   const fechado = dia === 0;
   return {
@@ -291,11 +302,15 @@ export default function ConfiguracoesPage() {
         throw new Error("Telefone inválido. Use o formato (DD) 999999999");
       }
 
+        const rawName = payload.salao.nome.trim();
+        const sanitizedName = sanitizeSalaoNomeForEvolution(rawName);
+        if (!sanitizedName) throw new Error("Nome do estabelecimento inválido");
+
         const { data: saved, error } = await supabase
           .from("saloes")
           .upsert({
             id: payload.salao.id,
-            nome: payload.salao.nome.trim(),
+            nome: sanitizedName,
             telefone: telefoneJid || null,
             endereco: payload.salao.endereco?.trim() || null,
             agendamento_antecedencia_modo: payload.salao.agendamento_antecedencia_modo,
@@ -306,6 +321,18 @@ export default function ConfiguracoesPage() {
       if (error) throw error;
       const salaoId = saved?.id ?? payload.salao.id;
       if (!salaoId) throw new Error("Falha ao salvar salão");
+
+      // Sincroniza os dados com o cadastro do estabelecimento
+      if (user?.id) {
+        await supabase
+          .from("cadastros_estabelecimento")
+          .update({
+            nome_estabelecimento: sanitizedName,
+            telefone: telefoneJid || null,
+            endereco: payload.salao.endereco?.trim() || null,
+          })
+          .eq("user_id", user.id);
+      }
 
       await ensureDias.mutateAsync(salaoId);
 
@@ -347,7 +374,7 @@ export default function ConfiguracoesPage() {
     const s = subscriptionQuery.data as any;
     const pid = String(s?.product_id ?? "").toLowerCase();
     const pname = String(s?.product_name ?? "").toLowerCase();
-    if (pid.includes("pro_ia") || pname.includes("pro") || pname.includes("ia")) return "pro_ia";
+    if (s?.product_id === "pro_ia") return "pro_ia";
     return "profissional";
   }, [subscriptionQuery.data]);
 
