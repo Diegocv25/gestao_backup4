@@ -25,7 +25,7 @@ export default function ClientePortalEntrarPage() {
   return (
     <PortalShell
       title="Entrar"
-      subtitle={salaoQuery.data ? `Salão: ${salaoQuery.data.nome}` : undefined}
+      subtitle={salaoQuery.data ? `${salaoQuery.data.nome}` : undefined}
       logoUrl={salaoQuery.data?.logo_url}
       onBack={() => nav(`/cliente/${tokenValue}`)}
     >
