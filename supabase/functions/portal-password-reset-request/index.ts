@@ -102,7 +102,10 @@ serve(async (req) => {
     });
     if (insErr) throw insErr;
 
-    const resetUrl = `https://id-preview--2195ef19-036f-4926-9a8e-4b3085c4a170.lovable.app/cliente/${encodeURIComponent(
+    const portalBase = (Deno.env.get("PORTAL_BASE_URL") || Deno.env.get("AUTH_BASE_URL") || Deno.env.get("FRONTEND_BASE_URL") || "").trim().replace(/\/+$/, "");
+    if (!portalBase) throw new Error("Missing PORTAL_BASE_URL (or AUTH_BASE_URL/FRONTEND_BASE_URL)");
+
+    const resetUrl = `${portalBase}/cliente/${encodeURIComponent(
       token.trim(),
     )}/resetar-senha?code=${encodeURIComponent(rawCode)}`;
 
