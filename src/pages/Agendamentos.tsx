@@ -118,7 +118,14 @@ export default function AgendamentosPage() {
     if (typeof window === "undefined") return "";
     const token = salaoTokenQuery.data;
     if (!token) return "";
-    return `${window.location.origin}/cliente/${token}`;
+
+    // Preferir o domínio do portal (para o salão enviar ao cliente), mesmo estando logado no app.
+    const portalBase = String(import.meta.env.VITE_PORTAL_BASE_URL || "")
+      .trim()
+      .replace(/\/+$/, "");
+
+    const base = portalBase || window.location.origin;
+    return `${base}/cliente/${token}`;
   }, [salaoTokenQuery.data]);
 
 
