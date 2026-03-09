@@ -1,235 +1,268 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.93.2";
+// Edge Function: kiwify-webhook
+// Public endpoint (verify_jwt=false). Recebe eventos da Kiwify.
 
-function json(data: unknown, init?: ResponseInit) {
-  return new Response(JSON.stringify(data), {
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.3";
+
+function json(body: unknown, init: ResponseInit, cors: Record<string, string>) {
+  return new Response(JSON.stringify(body), {
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "content-type,authorization,x-kiwify-token,x-webhook-token,x-api-key",
-      "Access-Control-Allow-Methods": "POST,OPTIONS",
-      ...(init?.headers ?? {}),
-    },
+    headers: { "Content-Type": "application/json", ...cors, ...(init.headers ?? {}) },
   });
 }
 
-function getServiceClient() {
-  const url = Deno.env.get("SUPABASE_URL");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!url || !serviceKey) throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
-
-  return createClient(url, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-}
-
-function asText(v: unknown): string | null {
-  if (typeof v !== "string") return null;
-  const t = v.trim();
-  return t ? t : null;
-}
-
-function getTrigger(payload: Record<string, unknown>) {
-  const w = payload.webhooks_event as Record<string, unknown> | undefined;
-  return (
-    asText(w?.type) ??
-    asText(payload.trigger) ??
-    asText(payload.event) ??
-    asText(payload.type) ??
-    "unknown"
-  );
-}
-
-function getOrderId(payload: Record<string, unknown>) {
-  const order = payload.order as Record<string, unknown> | undefined;
-  const sale = payload.sale as Record<string, unknown> | undefined;
-  return asText(payload.order_id) ?? asText(payload.sale_id) ?? asText(order?.id) ?? asText(sale?.id);
-}
-
-function getSubscriptionId(payload: Record<string, unknown>) {
-  const sub = payload.subscription as Record<string, unknown> | undefined;
-  return asText(payload.subscription_id) ?? asText(sub?.id);
-}
-
-function getCustomerEmail(payload: Record<string, unknown>) {
-  const customer = payload.customer as Record<string, unknown> | undefined;
-  const buyer = payload.buyer as Record<string, unknown> | undefined;
-  const email = asText(customer?.email) ?? asText(buyer?.email) ?? asText(payload.email);
-  return email?.toLowerCase() ?? null;
-}
-
-function getProduct(payload: Record<string, unknown>) {
-  const product = payload.product as Record<string, unknown> | undefined;
+function buildCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") ?? "*";
   return {
-    id: asText(payload.product_id) ?? asText(product?.id),
-    name: asText(payload.product_name) ?? asText(product?.name),
+    "Access-Control-Allow-Origin": origin,
+    Vary: "Origin",
+    "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, x-webhook-token, x-kiwify-token",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
   };
 }
 
-function getHeaderToken(req: Request) {
-  const candidates = [
-    req.headers.get("x-kiwify-token"),
-    req.headers.get("x-webhook-token"),
-    req.headers.get("x-api-key"),
-  ];
-  const auth = req.headers.get("authorization");
-  if (auth?.toLowerCase().startsWith("bearer ")) {
-    candidates.push(auth.slice(7).trim());
-  }
+function digitsOnly(value: string | null | undefined) {
+  return (value ?? "").replace(/\D/g, "");
+}
 
-  for (const c of candidates) {
-    const t = asText(c);
-    if (t) return t;
-  }
+function getEventType(payload: any): string {
+  return String(
+    payload?.webhooks_event?.type ??
+      payload?.event ??
+      payload?.type ??
+      payload?.data?.event ??
+      "",
+  )
+    .trim()
+    .toLowerCase();
+}
+
+function getEventId(payload: any): string | null {
+  return (
+    payload?.event_id ??
+    payload?.id ??
+    payload?.webhooks_event?.id ??
+    payload?.order?.id ??
+    payload?.order_id ??
+    payload?.sale_id ??
+    payload?.transaction_id ??
+    null
+  );
+}
+
+function inferPlanIdFromPayload(payload: any): "profissional" | "pro_ia" | null {
+  const raw = String(
+    payload?.product?.name ??
+      payload?.offer?.name ??
+      payload?.plan?.name ??
+      payload?.product_name ??
+      "",
+  )
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+  if (!raw) return null;
+  if (raw.includes("pro") && raw.includes("ia")) return "pro_ia";
+  if (raw.includes("profissional")) return "profissional";
   return null;
 }
 
-async function sha256Hex(input: string) {
-  const data = new TextEncoder().encode(input);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  const bytes = new Uint8Array(digest);
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-function mapStatus(trigger: string): string {
-  switch (trigger) {
+function mapStatusPagamento(eventType: string): string {
+  switch (eventType) {
+    case "pix_gerado":
+      return "PENDENTE_PIX";
     case "compra_aprovada":
-    case "subscription_renewed":
-      return "active";
-    case "subscription_late":
-      return "late_grace";
-    case "subscription_canceled":
-      return "canceled";
-    case "compra_reembolsada":
-      return "refunded";
-    case "chargeback":
-      return "chargeback";
-    case "compra_recusada":
-      return "payment_failed";
+      return "PAGO";
+    case "assinatura_renovada":
+      return "PAGO";
+    case "reembolso":
+      return "REEMBOLSADO";
+    case "assinatura_cancelada":
+      return "CANCELADO";
+    case "assinatura_atrasada":
+      return "ATRASADO";
     default:
-      return "pending";
+      return eventType || "DESCONHECIDO";
   }
 }
 
-function buildHeadersSnapshot(req: Request) {
-  const out: Record<string, string> = {};
-  for (const [k, v] of req.headers.entries()) out[k] = v;
-  return out;
+function isActiveEvent(eventType: string): boolean {
+  return eventType === "compra_aprovada" || eventType === "assinatura_renovada";
 }
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") return json({ ok: true });
-  if (req.method !== "POST") return json({ ok: false, error: "Method not allowed" }, { status: 405 });
+async function sendAccessEmail(session: any) {
+  const resendApiKey = Deno.env.get("RESEND_API_KEY");
+  const resendFrom = Deno.env.get("RESEND_FROM");
+  const resendReplyTo = Deno.env.get("RESEND_REPLY_TO");
+  const resendTestTo = Deno.env.get("RESEND_TEST_TO");
+  const authBaseUrl = (Deno.env.get("AUTH_BASE_URL") || "").replace(/\/+$/, "");
 
-  const sb = getServiceClient();
-  let insertedEventId: string | null = null;
+  if (!resendApiKey || !resendFrom || !authBaseUrl) {
+    console.warn("[kiwify-webhook] email config ausente, ignorando envio de email de acesso");
+    return;
+  }
+
+  const accessLink = `${authBaseUrl}/auth`;
+  const toAddress = resendTestTo ? [resendTestTo] : [session.user_email];
+
+  const payload: any = {
+    from: resendFrom,
+    to: toAddress,
+    subject: "Pagamento confirmado — acesso ao sistema",
+    html: `
+      <div style="font-family: sans-serif; font-size: 16px; color: #333;">
+        ${resendTestTo ? `<p style="background:#ffeb3b; padding:10px; font-weight:bold;">[TEST MODE] Destinatário original: ${session.user_email}</p>` : ""}
+        <h1>Pagamento confirmado ✅</h1>
+        <p>Olá <strong>${session.nome_proprietario ?? "cliente"}</strong>,</p>
+        <p>Seu pagamento foi confirmado e seu cadastro está ativo.</p>
+        <p>Para acessar o sistema de gestão, use o link abaixo:</p>
+        <p>
+          <a href="${accessLink}" style="display:inline-block;background:#000;color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:bold;">
+            Acessar o sistema
+          </a>
+        </p>
+        <p style="font-size:14px;color:#666;">Ou copie o link: <a href="${accessLink}">${accessLink}</a></p>
+      </div>
+    `,
+  };
+
+  if (resendReplyTo) payload.reply_to = resendReplyTo;
+
+  const r = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!r.ok) {
+    const t = await r.text();
+    console.error("[kiwify-webhook] resend failed", r.status, t);
+  }
+}
+
+Deno.serve(async (req) => {
+  const cors = buildCorsHeaders(req);
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, { status: 405 }, cors);
+
   try {
-    const payload = (await req.json()) as Record<string, unknown>;
+    const url = new URL(req.url);
+    const payload = await req.json();
 
-    const expectedToken = asText(Deno.env.get("KIWIFY_WEBHOOK_TOKEN"));
-    const queryToken = asText(new URL(req.url).searchParams.get("token"));
-    const bodyToken = asText(payload.token);
-    const headerToken = getHeaderToken(req);
-    const incomingToken = headerToken ?? queryToken ?? bodyToken;
+    const expectedToken = Deno.env.get("KIWIFY_WEBHOOK_TOKEN") || "";
+    const tokenReceived =
+      req.headers.get("x-webhook-token") ||
+      req.headers.get("x-kiwify-token") ||
+      req.headers.get("x-kiwify-webhook-token") ||
+      req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ||
+      payload?.token ||
+      payload?.webhook_token ||
+      payload?.webhooks_event?.token ||
+      url.searchParams.get("token") ||
+      "";
 
-    if (expectedToken && incomingToken !== expectedToken) {
-      return json({ ok: false, error: "invalid webhook token" }, { status: 403 });
+    if (!expectedToken || tokenReceived !== expectedToken) {
+      return json({ error: "Unauthorized" }, { status: 401 }, cors);
     }
 
-    const trigger = getTrigger(payload);
-    const orderId = getOrderId(payload);
-    const subscriptionId = getSubscriptionId(payload);
-    const customerEmail = getCustomerEmail(payload);
-    const product = getProduct(payload);
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !serviceRoleKey) {
+      return json({ error: "Server config missing" }, { status: 500 }, cors);
+    }
 
-    const rawPayload = JSON.stringify(payload);
-    const eventHash = await sha256Hex(`${trigger}|${orderId ?? ""}|${subscriptionId ?? ""}|${customerEmail ?? ""}|${rawPayload}`);
+    const admin = createClient(supabaseUrl, serviceRoleKey);
 
-    const { data: insertedEvent, error: eventInsertError } = await sb
-      .from("kiwify_events")
-      .insert({
-        trigger,
-        event_hash: eventHash,
-        order_id: orderId,
-        subscription_id: subscriptionId,
-        customer_email: customerEmail,
-        raw_payload: payload,
-        raw_headers: buildHeadersSnapshot(req),
-        processed_ok: false,
-      })
-      .select("id")
-      .single();
+    const eventType = getEventType(payload);
+    const eventId = getEventId(payload);
+    const customerEmail = String(payload?.customer?.email ?? payload?.email ?? "").trim().toLowerCase();
+    const customerDoc = digitsOnly(payload?.customer?.document ?? payload?.customer?.cpf ?? payload?.customer?.cnpj ?? payload?.document);
+    const orderId = String(payload?.order?.id ?? payload?.order_id ?? payload?.sale_id ?? payload?.transaction_id ?? "").trim();
 
-    insertedEventId = insertedEvent?.id ?? null;
+    // idempotência por event_id + evento
+    if (eventId) {
+      const { data: already } = await admin
+        .from("payment_sessions")
+        .select("id")
+        .eq("event_id", String(eventId))
+        .maybeSingle();
 
-    if (eventInsertError) {
-      const msg = String(eventInsertError.message ?? eventInsertError);
-      if (msg.toLowerCase().includes("duplicate") || msg.toLowerCase().includes("unique")) {
-        return json({ ok: true, duplicate: true, trigger, event_hash: eventHash });
+      if (already) {
+        return json({ received: true, duplicate: true }, { status: 200 }, cors);
       }
-      throw eventInsertError;
     }
 
-    const status = mapStatus(trigger);
+    let session: any = null;
 
-    if (customerEmail) {
-      const graceDays = Number(Deno.env.get("KIWIFY_GRACE_DAYS") ?? "3");
-      const graceUntil = Number.isFinite(graceDays)
-        ? new Date(Date.now() + graceDays * 24 * 60 * 60 * 1000).toISOString()
-        : null;
-
-      const meta: Record<string, unknown> = {
-        grace_days: Number.isFinite(graceDays) ? graceDays : 3,
-      };
-      if (status === "late_grace" && graceUntil) meta.grace_until = graceUntil;
-
-      const { error: upsertError } = await sb.from("subscriptions").upsert(
-        {
-          provider: "kiwify",
-          customer_email: customerEmail,
-          status,
-          product_id: product.id,
-          product_name: product.name,
-          order_id: orderId,
-          subscription_id: subscriptionId,
-          last_event_trigger: trigger,
-          meta,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "provider,customer_email" },
-      );
-
-      if (upsertError) throw upsertError;
+    if (orderId) {
+      const { data } = await admin
+        .from("payment_sessions")
+        .select("*")
+        .eq("provider_bill_id", orderId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (data) session = data;
     }
 
-    await sb
-      .from("kiwify_events")
-      .update({ processed_ok: true, processed_at: new Date().toISOString() })
-      .eq("id", insertedEvent.id);
-
-    return json({
-      ok: true,
-      trigger,
-      status,
-      customer_email: customerEmail,
-      order_id: orderId,
-      subscription_id: subscriptionId,
-      event_hash: eventHash,
-    });
-  } catch (error: any) {
-    if (insertedEventId) {
-      await sb
-        .from("kiwify_events")
-        .update({
-          processed_ok: false,
-          processed_at: new Date().toISOString(),
-          error: String(error?.message ?? error),
-        })
-        .eq("id", insertedEventId);
+    if (!session && customerEmail) {
+      const { data } = await admin
+        .from("payment_sessions")
+        .select("*")
+        .ilike("user_email", customerEmail)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (data) session = data;
     }
-    return json({ ok: false, error: String(error?.message ?? error) }, { status: 500 });
+
+    if (!session && customerDoc) {
+      const { data } = await admin
+        .from("payment_sessions")
+        .select("*")
+        .eq("tax_id", customerDoc)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (data) session = data;
+    }
+
+    if (!session) {
+      return json({ received: true, ignored: true, reason: "session_not_found" }, { status: 200 }, cors);
+    }
+
+    const inferredPlan = inferPlanIdFromPayload(payload) ?? (session.plan_id === "pro_ia" ? "pro_ia" : "profissional");
+    const nowIso = new Date().toISOString();
+
+    const updateData: Record<string, any> = {
+      provider: "kiwify",
+      plan_id: inferredPlan,
+      status_pagamento: mapStatusPagamento(eventType),
+      ultimo_evento: eventType || null,
+      data_ultimo_evento: nowIso,
+      payload_raw: payload,
+      event_id: eventId,
+    };
+
+    if (orderId) updateData.provider_bill_id = orderId;
+
+    if (isActiveEvent(eventType)) {
+      updateData.status = "paid_waiting_account";
+      updateData.paid_at = session.paid_at ?? nowIso;
+    }
+
+    await admin.from("payment_sessions").update(updateData).eq("id", session.id);
+
+    if (isActiveEvent(eventType) && session.status !== "paid" && session.status !== "paid_waiting_account") {
+      await sendAccessEmail({ ...session, plan_id: inferredPlan });
+    }
+
+    return json({ received: true, processed: true, event: eventType }, { status: 200 }, cors);
+  } catch (e) {
+    console.error("kiwify-webhook error:", e);
+    return json({ error: "Internal error" }, { status: 500 }, buildCorsHeaders(req));
   }
 });
