@@ -38,6 +38,7 @@ import ClientePortalPrimeiroAcessoPage from "./pages/ClientePortalPrimeiroAcesso
 import ClientePortalEsqueciSenhaPage from "./pages/ClientePortalEsqueciSenha";
 import ClientePortalResetarSenhaPage from "./pages/ClientePortalResetarSenha";
 import ClientePortalCadastroPage from "./pages/ClientePortalCadastro";
+import PortalHome from "./pages/PortalHome";
 
 import ProfissionalAgendamentosPage from "./pages/ProfissionalAgendamentos";
 import ProfissionalAgendamentoFormPage from "./pages/ProfissionalAgendamentoFormPage";
@@ -60,6 +61,7 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/auth" element={<AuthPage />} />
+              <Route path="/portal" element={<PortalHome />} />
               <Route path="/cliente/:token" element={<ClientePublicoPage />} />
 
               {/* Portal do cliente (auth própria via Edge Functions) */}

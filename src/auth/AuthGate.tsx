@@ -17,6 +17,14 @@ export function AuthGate() {
     const isClientePortal = location.pathname.startsWith("/cliente/");
     const from = `${location.pathname}${location.search}${location.hash ?? ""}`;
 
+    const hostname = typeof window !== "undefined" ? window.location.hostname : "";
+    const isPortalHost = hostname.startsWith("portal.");
+
+    // No domínio do portal, evite redirecionar para /auth por padrão (para não confundir clientes).
+    if (isPortalHost && !isClientePortal) {
+      return <Navigate to="/portal" replace state={{ from }} />;
+    }
+
     return (
       <Navigate
         to="/auth"
