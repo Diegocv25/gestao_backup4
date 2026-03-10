@@ -41,7 +41,8 @@ Deno.serve(async (req) => {
     if (!resendFrom) throw new Error("Missing RESEND_FROM");
 
     const authBaseUrl = (Deno.env.get("AUTH_BASE_URL") || Deno.env.get("APP_BASE_URL") || "").trim().replace(/\/+$/, "");
-    const redirectTo = authBaseUrl ? `${authBaseUrl}/auth` : `${new URL(req.url).origin}/auth`;
+    // Important: include type=recovery so the frontend shows the ResetPasswordForm.
+    const redirectTo = authBaseUrl ? `${authBaseUrl}/auth?type=recovery` : `${new URL(req.url).origin}/auth?type=recovery`;
 
     const admin = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },
