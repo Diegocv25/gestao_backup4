@@ -28,6 +28,7 @@ type Row = {
   comissaoServicosPaga: number;
   comissaoServicosPendente: number;
   comissaoProdutos: number;
+  custoProdutos: number;
   receitaBruta: number;
   rendaSalao: number;
 };
@@ -111,6 +112,7 @@ export default function RelatoriosPorFuncionario({ inicio, fim }: { inicio: stri
             comissaoServicosPaga: 0,
             comissaoServicosPendente: 0,
             comissaoProdutos: 0,
+            custoProdutos: 0,
             receitaBruta: 0,
             rendaSalao: 0,
           });
@@ -139,6 +141,7 @@ export default function RelatoriosPorFuncionario({ inicio, fim }: { inicio: stri
         r.receitaBruta += safeNumber(v.total_venda);
         const custo = safeNumber(v.total_custo);
         const comissaoProduto = safeNumber(v.comissao_funcionario);
+        r.custoProdutos += custo;
         r.comissaoProdutos += comissaoProduto;
         r.rendaSalao += safeNumber(v.total_venda) - custo - comissaoProduto;
       });
@@ -331,6 +334,7 @@ export default function RelatoriosPorFuncionario({ inicio, fim }: { inicio: stri
                 <TableHead className="text-right">Comissão serv. paga</TableHead>
                 <TableHead className="text-right">Comissão serv. pendente</TableHead>
                 <TableHead className="text-right">Comissão produtos</TableHead>
+                <TableHead className="text-right">Custo produtos</TableHead>
                 <TableHead className="text-right">Receita bruta</TableHead>
                 <TableHead className="text-right">Renda p/ estabelecimento</TableHead>
               </TableRow>
@@ -344,6 +348,7 @@ export default function RelatoriosPorFuncionario({ inicio, fim }: { inicio: stri
                   <TableCell className="text-right tabular-nums">{formatBRL(r.comissaoServicosPaga)}</TableCell>
                   <TableCell className="text-right tabular-nums">{formatBRL(r.comissaoServicosPendente)}</TableCell>
                   <TableCell className="text-right tabular-nums">{formatBRL(r.comissaoProdutos)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatBRL(r.custoProdutos)}</TableCell>
                   <TableCell className="text-right tabular-nums">{formatBRL(r.receitaBruta)}</TableCell>
                   <TableCell className="text-right tabular-nums">{formatBRL(r.rendaSalao)}</TableCell>
                 </TableRow>
@@ -351,7 +356,7 @@ export default function RelatoriosPorFuncionario({ inicio, fim }: { inicio: stri
 
               {(porFuncionarioQuery.data?.rows ?? []).length === 0 && !porFuncionarioQuery.isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-sm text-muted-foreground">
+                  <TableCell colSpan={9} className="text-sm text-muted-foreground">
                     Nenhum dado no período.
                   </TableCell>
                 </TableRow>

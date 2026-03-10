@@ -90,8 +90,6 @@ export default function RelatoriosComparativos({
         comCalcPrev,
         comPagasAtual,
         comPagasPrev,
-        comissaoProdutosAtual,
-        comissaoProdutosPrev,
       ] = await Promise.all([
         supabase
           .from("agendamentos")
@@ -111,14 +109,14 @@ export default function RelatoriosComparativos({
 
         supabase
           .from("vendas_produtos")
-          .select("total_venda")
+          .select("total_venda,total_custo,comissao_funcionario")
           .eq("salao_id", salaoId as string)
           .gte("created_at", inicioDate.toISOString())
           .lt("created_at", fimDateExclusivo.toISOString()),
 
         supabase
           .from("vendas_produtos")
-          .select("total_venda")
+          .select("total_venda,total_custo,comissao_funcionario")
           .eq("salao_id", salaoId as string)
           .gte("created_at", prev.prevInicio.toISOString())
           .lt("created_at", prev.prevFimExclusivo.toISOString()),
@@ -153,52 +151,59 @@ export default function RelatoriosComparativos({
           .gte("pago_em", prev.prevInicio.toISOString())
           .lt("pago_em", prev.prevFimExclusivo.toISOString()),
 
-        supabase
-          .from("vendas_produtos")
-          .select("comissao_funcionario")
-          .eq("salao_id", salaoId as string)
-          .gte("created_at", inicioDate.toISOString())
-          .lt("created_at", fimDateExclusivo.toISOString()),
 
-        supabase
-          .from("vendas_produtos")
-          .select("comissao_funcionario")
-          .eq("salao_id", salaoId as string)
-          .gte("created_at", prev.prevInicio.toISOString())
-          .lt("created_at", prev.prevFimExclusivo.toISOString()),
       ]);
 
-      const errors = [agAtual.error, agPrev.error, vendasProdutosAtual.error, vendasProdutosPrev.error, comCalcAtual.error, comCalcPrev.error, comPagasAtual.error, comPagasPrev.error, comissaoProdutosAtual.error, comissaoProdutosPrev.error].filter(
-        Boolean,
-      );
+      const errors = [
+        agAtual.error,
+        agPrev.error,
+        vendasProdutosAtual.error,
+        vendasProdutosPrev.error,
+        comCalcAtual.error,
+        comCalcPrev.error,
+        comPagasAtual.error,
+        comPagasPrev.error,
+      ].filter(Boolean);
       if (errors.length) throw errors[0];
 
       const receitaServicosAtual = (agAtual.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.total_valor), 0);
       const receitaServicosPrev = (agPrev.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.total_valor), 0);
       const receitaVendasAtual = (vendasProdutosAtual.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.total_venda), 0);
       const receitaVendasPrev = (vendasProdutosPrev.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.total_venda), 0);
-      
+
+      const custoProdutosAtual = (vendasProdutosAtual.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.total_custo), 0);
+      const custoProdutosPrev = (vendasProdutosPrev.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.total_custo), 0);
+
+      const comissaoProdutosAtualSum = (vendasProdutosAtual.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.comissao_funcionario), 0);
+      const comissaoProdutosPrevSum = (vendasProdutosPrev.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.comissao_funcionario), 0);
+
       const receitaBrutaAtual = receitaServicosAtual + receitaVendasAtual;
       const receitaBrutaPrev = receitaServicosPrev + receitaVendasPrev;
 
-      const comissoesCalcAtual = (comCalcAtual.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.valor_calculado), 0);
-      const comissoesCalcPrev = (comCalcPrev.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.valor_calculado), 0);
-      const comissaoProdutosAtualSum = (comissaoProdutosAtual.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.comissao_funcionario), 0);
-      const comissaoProdutosPrevSum = (comissaoProdutosPrev.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.comissao_funcionario), 0);
+      const comissoesServicosAtual = (comCalcAtual.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.valor_calculado), 0);
+      const comissoesServicosPrev = (comCalcPrev.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.valor_calculado), 0);
 
-      const receitaLiquidaAtual = receitaBrutaAtual - comissoesCalcAtual - comissaoProdutosAtualSum;
-      const receitaLiquidaPrev = receitaBrutaPrev - comissoesCalcPrev - comissaoProdutosPrevSum;
+      const comissoesTotalAtual = comissoesServicosAtual + comissaoProdutosAtualSum;
+      const comissoesTotalPrev = comissoesServicosPrev + comissaoProdutosPrevSum;
 
-      const comissoesPagasAtualSum = (comPagasAtual.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.valor_calculado), 0);
-      const comissoesPagasPrevSum = (comPagasPrev.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.valor_calculado), 0);
+      // Resultado do período (antes de despesas/salários): Receita bruta - custos de produtos - comissões
+      const resultadoAtual = receitaBrutaAtual - custoProdutosAtual - comissoesTotalAtual;
+      const resultadoPrev = receitaBrutaPrev - custoProdutosPrev - comissoesTotalPrev;
+
+      const comissoesServicosPagasAtual = (comPagasAtual.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.valor_calculado), 0);
+      const comissoesServicosPagasPrev = (comPagasPrev.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.valor_calculado), 0);
 
       return {
         receitaBrutaAtual,
         receitaBrutaPrev,
-        receitaLiquidaAtual,
-        receitaLiquidaPrev,
-        comissoesPagasAtualSum,
-        comissoesPagasPrevSum,
+        custoProdutosAtual,
+        custoProdutosPrev,
+        comissoesTotalAtual,
+        comissoesTotalPrev,
+        comissoesServicosPagasAtual,
+        comissoesServicosPagasPrev,
+        resultadoAtual,
+        resultadoPrev,
       };
     },
   });
@@ -228,23 +233,29 @@ export default function RelatoriosComparativos({
 
       </section>
 
-      <section className="grid gap-4 grid-cols-1 md:grid-cols-3">
+      <section className="grid gap-4 grid-cols-1 md:grid-cols-4">
         <FinancialKpiCard
           title="Receita bruta"
           value={formatBRL(comparativosQuery.data?.receitaBrutaAtual ?? 0)}
           subtitle={`Serviços + Produtos | Anterior: ${formatBRL(comparativosQuery.data?.receitaBrutaPrev ?? 0)}`}
         />
-        
+
+        <FinancialKpiCard
+          title="Custos (produtos)"
+          value={formatBRL(comparativosQuery.data?.custoProdutosAtual ?? 0)}
+          subtitle={`Custo médio × quantidade | Anterior: ${formatBRL(comparativosQuery.data?.custoProdutosPrev ?? 0)}`}
+        />
+
         <FinancialKpiCard
           title="Comissões"
-          value={formatBRL(comparativosQuery.data?.comissoesPagasAtualSum ?? 0)}
-          subtitle={`Pagas no período | Anterior: ${formatBRL(comparativosQuery.data?.comissoesPagasPrevSum ?? 0)}`}
+          value={formatBRL(comparativosQuery.data?.comissoesTotalAtual ?? 0)}
+          subtitle={`Serviços + Produtos | Anterior: ${formatBRL(comparativosQuery.data?.comissoesTotalPrev ?? 0)}`}
         />
-        
+
         <FinancialKpiCard
-          title="Receita líquida"
-          value={formatBRL(comparativosQuery.data?.receitaLiquidaAtual ?? 0)}
-          subtitle={`Receita − Comissões | Anterior: ${formatBRL(comparativosQuery.data?.receitaLiquidaPrev ?? 0)}`}
+          title="Resultado do período"
+          value={formatBRL(comparativosQuery.data?.resultadoAtual ?? 0)}
+          subtitle={`Receita − Custos − Comissões | Anterior: ${formatBRL(comparativosQuery.data?.resultadoPrev ?? 0)}`}
           highlight={true}
         />
       </section>

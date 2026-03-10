@@ -55,7 +55,7 @@ export default function RelatoriosDespesas({
           .lt("created_at", fimDateExclusivo.toISOString()),
         supabase
           .from("vendas_produtos")
-          .select("total_venda")
+          .select("total_venda,total_custo,comissao_funcionario")
           .eq("salao_id", salaoId as string)
           .gte("created_at", inicioDate.toISOString())
           .lt("created_at", fimDateExclusivo.toISOString()),
@@ -67,10 +67,16 @@ export default function RelatoriosDespesas({
       const receitaServicos = (ag.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.total_valor), 0);
       const receitaVendasProdutos = (vendasProdutos.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.total_venda), 0);
       const receitaBruta = receitaServicos + receitaVendasProdutos;
-      const comissoesCalc = (comCalc.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.valor_calculado), 0);
-      const receitaLiquida = receitaBruta - comissoesCalc;
 
-      return { receitaBruta, receitaLiquida };
+      const custoProdutos = (vendasProdutos.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.total_custo), 0);
+      const comissaoProdutos = (vendasProdutos.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.comissao_funcionario), 0);
+      const comissoesServicos = (comCalc.data ?? []).reduce((acc, r: any) => acc + safeNumber(r.valor_calculado), 0);
+      const comissoesTotal = comissoesServicos + comissaoProdutos;
+
+      // Resultado do período (antes de despesas/salários)
+      const resultadoPeriodo = receitaBruta - custoProdutos - comissoesTotal;
+
+      return { receitaBruta, resultadoPeriodo, custoProdutos, comissoesTotal };
     },
   });
 
@@ -191,11 +197,13 @@ export default function RelatoriosDespesas({
   });
 
   const lucroFinal = useMemo(() => {
-    const receitaLiquida = totaisPeriodoQuery.data?.receitaLiquida ?? 0;
+    const resultadoPeriodo = totaisPeriodoQuery.data?.resultadoPeriodo ?? 0;
     const despesas = despesasQuery.data?.total ?? 0;
     const salariosFixos = salariosFixosQuery.data?.total ?? 0;
-    return receitaLiquida - despesas - salariosFixos;
+    return resultadoPeriodo - despesas - salariosFixos;
   }, [totaisPeriodoQuery.data, despesasQuery.data, salariosFixosQuery.data]);
+
+  const lucroLabel = lucroFinal < 0 ? "Prejuízo do período" : "Lucro final";
 
   return (
     <section className="space-y-4">
@@ -220,12 +228,12 @@ export default function RelatoriosDespesas({
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Lucro final</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{lucroLabel}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-semibold tracking-tight">{formatBRL(lucroFinal)}</div>
             <div className="mt-1 text-xs text-muted-foreground">
-              (Serviços + Produtos) − Comissões − Despesas − Salários (período)
+              Receita bruta − Custos (produtos) − Comissões − Despesas − Salários (mês)
             </div>
           </CardContent>
         </Card>
