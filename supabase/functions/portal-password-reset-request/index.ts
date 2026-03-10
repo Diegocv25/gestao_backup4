@@ -109,10 +109,15 @@ serve(async (req) => {
       token.trim(),
     )}/resetar-senha?code=${encodeURIComponent(rawCode)}`;
 
-    const emailPayload = {
-      from: "Portal <onboarding@resend.dev>",
+    const resendFrom = (Deno.env.get("RESEND_FROM") || "").trim();
+    const resendReplyTo = (Deno.env.get("RESEND_REPLY_TO") || "").trim();
+    if (!resendFrom) throw new Error("Missing RESEND_FROM");
+
+    const emailPayload: any = {
+      from: resendFrom,
+      ...(resendReplyTo ? { reply_to: resendReplyTo } : {}),
       to: [email.trim()],
-      subject: `Redefinir senha - ${salao.nome}`,
+      subject: `Redefinir senha — Nexus Automação (${salao.nome})`,
       html: `
         <h2>Redefinição de senha</h2>
         <p>Você solicitou redefinir a senha do Portal do cliente do estabelecimento <strong>${salao.nome}</strong>.</p>
