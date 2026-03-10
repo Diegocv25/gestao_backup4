@@ -50,25 +50,34 @@ export function AccessProvider({ children }: { children: React.ReactNode }) {
           .order("created_at", { ascending: true });
         if (rolesErr) throw rolesErr;
 
-        const first = (roles ?? [])[0] as { role?: AppRole; salao_id?: string } | undefined;
-        const nextRole = (first?.role ?? null) as AppRole | null;
-        const nextSalaoId = (first?.salao_id ?? null) as string | null;
+        const list = (roles ?? []) as Array<{ role?: AppRole; salao_id?: string; created_at?: string }>;
+        // Prefer roles that have a salao_id (staff/profissional should be scoped to a salao)
+        const preferred = list.find((r) => !!r?.salao_id) ?? list[0];
+        const nextRole = ((preferred?.role ?? null) as AppRole | null) ?? null;
+        let nextSalaoId = (preferred?.salao_id ?? null) as string | null;
 
         let nextFuncionarioId: string | null = null;
         let nextFuncionarioAtivo: boolean | null = null;
+        let nextFuncionarioSalaoId: string | null = null;
 
         // Para qualquer role operacional, se houver vínculo em funcionarios,
         // carregamos ativo para controlar acesso a rotas sensíveis.
         if (nextRole && nextRole !== "customer") {
           const { data: f, error: fErr } = await sb
             .from("funcionarios")
-            .select("id,ativo")
+            .select("id,ativo,salao_id")
             .eq("auth_user_id", user.id)
             .maybeSingle();
           if (fErr) throw fErr;
 
           nextFuncionarioId = (f?.id ?? null) as string | null;
           nextFuncionarioAtivo = typeof f?.ativo === "boolean" ? Boolean(f.ativo) : null;
+          nextFuncionarioSalaoId = (f?.salao_id ?? null) as string | null;
+
+          // If user_roles didn't provide salao_id, fallback to funcionario.salao_id
+          if (!nextSalaoId && nextFuncionarioSalaoId) {
+            nextSalaoId = nextFuncionarioSalaoId;
+          }
         }
 
         if (!cancelled) {
