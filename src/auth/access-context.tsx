@@ -74,8 +74,12 @@ export function AccessProvider({ children }: { children: React.ReactNode }) {
           nextFuncionarioAtivo = typeof f?.ativo === "boolean" ? Boolean(f.ativo) : null;
           nextFuncionarioSalaoId = (f?.salao_id ?? null) as string | null;
 
-          // If user_roles didn't provide salao_id, fallback to funcionario.salao_id
-          if (!nextSalaoId && nextFuncionarioSalaoId) {
+          // Para profissionais/recepcionistas/gerentes, o salão deve sempre vir do vínculo em `funcionarios`.
+          // Isso evita inconsistência quando `user_roles.salao_id` estiver errado/desatualizado.
+          if (nextFuncionarioSalaoId && ["profissional", "recepcionista", "gerente"].includes(String(nextRole))) {
+            nextSalaoId = nextFuncionarioSalaoId;
+          } else if (!nextSalaoId && nextFuncionarioSalaoId) {
+            // fallback quando user_roles não trouxe salao_id
             nextSalaoId = nextFuncionarioSalaoId;
           }
         }
