@@ -24,13 +24,13 @@ export function ForgotPasswordDialog({ open, onOpenChange }: { open: boolean; on
     }
 
     setLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(parsed.data, {
-      redirectTo: `${window.location.origin}/auth`,
+    const { data, error } = await supabase.functions.invoke("app-password-reset-request", {
+      body: { email: parsed.data },
     });
     setLoading(false);
 
     if (error) {
-      toast({ title: "Não foi possível enviar", description: error.message, variant: "destructive" });
+      toast({ title: "Não foi possível enviar", description: "Tente novamente em instantes.", variant: "destructive" });
       return;
     }
 
