@@ -27,6 +27,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
    const { data: salaoId } = useSalaoId();
    const queryClient = useQueryClient();
    const [rows, setRows] = useState<VendaRow[]>([]);
+   const [savingIds, setSavingIds] = useState<Set<string>>(() => new Set());
  
    const produtosQuery = useQuery({
      queryKey: ["produtos", salaoId],
@@ -234,6 +235,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
    }
  
    async function saveRow(row: VendaRow) {
+     if (savingIds.has(row.id)) return;
+
      if (!row.produto_id || !row.quantidade || !row.preco_unitario || !row.funcionario_id) {
        toast({
          title: "Erro",
@@ -242,8 +245,23 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
        });
        return;
      }
-     await saveMutation.mutateAsync(row);
-     removeRow(row.id);
+
+     setSavingIds((prev) => {
+       const next = new Set(prev);
+       next.add(row.id);
+       return next;
+     });
+
+     try {
+       await saveMutation.mutateAsync(row);
+       removeRow(row.id);
+     } finally {
+       setSavingIds((prev) => {
+         const next = new Set(prev);
+         next.delete(row.id);
+         return next;
+       });
+     }
    }
  
    return (
@@ -374,7 +392,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
              ) : null}
  
              <div className="flex gap-2 sm:col-span-2">
-               <Button size="sm" onClick={() => saveRow(row)} disabled={saveMutation.isPending}>
+               <Button size="sm" onClick={() => saveRow(row)} disabled={saveMutation.isPending || savingIds.has(row.id)}>
                  <Save className="h-4 w-4" />
                </Button>
                <Button size="sm" variant="outline" onClick={() => duplicateRow(row)}>
