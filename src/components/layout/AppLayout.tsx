@@ -5,10 +5,34 @@ import { useQuery } from "@tanstack/react-query";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { ExpiryBanner } from "@/components/layout/ExpiryBanner";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { useEstabelecimentoId } from "@/hooks/useEstabelecimentoId";
+
+function Watermark({ url }: { url: string }) {
+  const { state, isMobile } = useSidebar();
+
+  const left = isMobile ? "0px" : state === "collapsed" ? "var(--sidebar-width-icon)" : "var(--sidebar-width)";
+
+  return (
+    <div
+      className="pointer-events-none fixed inset-y-0 right-0 z-0"
+      aria-hidden="true"
+      style={{
+        left,
+        // Marca d'água extremamente sutil por cima do bg-background
+        opacity: 0.035,
+        backgroundImage: `url(${url})`,
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "center",
+        backgroundSize: "min(70vw, 720px)",
+        backgroundAttachment: "fixed",
+        filter: "grayscale(1)",
+      }}
+    />
+  );
+}
 
 export function AppLayout() {
   const seededRef = useRef(false);
@@ -62,22 +86,7 @@ export function AppLayout() {
   return (
     <SidebarProvider>
       <div className="relative flex min-h-svh w-full bg-background">
-        {watermarkLogoUrl ? (
-          <div
-            className="pointer-events-none fixed inset-0 z-0"
-            aria-hidden="true"
-            style={{
-              // Marca d'água extremamente sutil por cima do bg-background
-              opacity: 0.035,
-              backgroundImage: `url(${watermarkLogoUrl})`,
-              backgroundRepeat: "no-repeat",
-              backgroundPosition: "center",
-              backgroundSize: "min(70vw, 720px)",
-              backgroundAttachment: "fixed",
-              filter: "grayscale(1)",
-            }}
-          />
-        ) : null}
+        {watermarkLogoUrl ? <Watermark url={watermarkLogoUrl} /> : null}
 
         <AppSidebar />
 
