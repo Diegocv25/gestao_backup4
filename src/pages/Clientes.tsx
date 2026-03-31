@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useSalaoId } from "@/hooks/useSalaoId";
@@ -8,8 +9,72 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "@/components/ui/use-toast";
 import { FormPageShell } from "@/components/layout/FormPageShell";
+
+function formatDateOnly(value?: string | null) {
+  if (!value) return "—";
+  const date = new Date(value.includes("T") ? value : `${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatMoney(value?: number | null) {
+  if (value == null) return "—";
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
+}
+
+function statusLabel(status?: string | null) {
+  switch (status) {
+    case "concluido":
+      return "Concluído";
+    case "cancelado":
+      return "Cancelado";
+    case "marcado":
+      return "Marcado";
+    case "confirmado":
+      return "Confirmado";
+    case "faltou":
+      return "Faltou";
+    default:
+      return status || "—";
+  }
+}
+
+function statusVariant(status?: string | null): "default" | "secondary" | "destructive" | "outline" {
+  switch (status) {
+    case "concluido":
+      return "default";
+    case "cancelado":
+      return "destructive";
+    case "confirmado":
+      return "secondary";
+    default:
+      return "outline";
+  }
+}
 
 export default function ClientesPage() {
   const qc = useQueryClient();
@@ -17,6 +82,7 @@ export default function ClientesPage() {
   const { data: salaoId } = useSalaoId();
 
   const [q, setQ] = useState("");
+  const [expandedClienteId, setExpandedClienteId] = useState<string | null>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["clientes", { salaoId }],
@@ -32,7 +98,6 @@ export default function ClientesPage() {
       const clientes = (data ?? []) as any[];
       if (clientes.length === 0) return [];
 
-      // Agregações: quantidade de atendimentos (concluídos) + quais serviços teve.
       const { data: ags, error: agErr } = await supabase
         .from("agendamentos")
         .select("id,cliente_id")
@@ -72,7 +137,6 @@ export default function ClientesPage() {
         });
       }
 
-      // Agregação: quantos cancelamentos o cliente já teve (para controle de "furo").
       const { data: cancels, error: cancelErr } = await supabase
         .from("agendamentos")
         .select("cliente_id")
@@ -96,6 +160,23 @@ export default function ClientesPage() {
           cancelamentos_count: cancelCountByCliente.get(cId) ?? 0,
         };
       });
+    },
+  });
+
+  const clienteHistoricoQuery = useQuery({
+    queryKey: ["cliente-historico", salaoId, expandedClienteId],
+    enabled: !!salaoId && !!expandedClienteId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("agendamentos")
+        .select(
+          "id,data_hora_inicio,status,total_valor,observacoes,funcionario:funcionarios(nome),itens:agendamento_itens(servico:servicos(nome))"
+        )
+        .eq("salao_id", salaoId as string)
+        .eq("cliente_id", expandedClienteId as string)
+        .order("data_hora_inicio", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as any[];
     },
   });
 
@@ -123,6 +204,10 @@ export default function ClientesPage() {
     onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
 
+  const toggleHistorico = (clienteId: string) => {
+    setExpandedClienteId((current) => (current === clienteId ? null : clienteId));
+  };
+
   return (
     <FormPageShell
       title="Clientes"
@@ -140,7 +225,11 @@ export default function ClientesPage() {
             <CardTitle className="text-base">Antes de começar</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            Cadastre o seu salão em <Button variant="link" className="px-0" onClick={() => nav("/configuracoes")}>Configurações</Button> para liberar os cadastros.
+            Cadastre o seu salão em{" "}
+            <Button variant="link" className="px-0" onClick={() => nav("/configuracoes")}>
+              Configurações
+            </Button>{" "}
+            para liberar os cadastros.
           </CardContent>
         </Card>
       ) : null}
@@ -171,44 +260,128 @@ export default function ClientesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((c: any) => (
-                  <TableRow key={c.id}>
-                    <TableCell className="font-medium">{c.nome}</TableCell>
-                    <TableCell>{c.telefone ?? "—"}</TableCell>
-                    <TableCell>{c.email ?? "—"}</TableCell>
-                    <TableCell>
-                      {c.data_nascimento 
-                        ? new Date(c.data_nascimento + 'T00:00:00').toLocaleDateString('pt-BR', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric'
-                          })
-                        : "—"}
-                    </TableCell>
-                    <TableCell>{c.created_at ? String(c.created_at).slice(0, 10) : "—"}</TableCell>
-                    <TableCell>{c.ultima_visita ?? "—"}</TableCell>
-                    <TableCell className="text-right tabular-nums">{c.atendimentos_count ?? 0}</TableCell>
-                    <TableCell className="text-right tabular-nums">{c.cancelamentos_count ?? 0}</TableCell>
-                    <TableCell className="max-w-[320px] truncate">
-                      {(c.atendimentos_servicos ?? []).length > 0 ? (c.atendimentos_servicos ?? []).join(", ") : "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="secondary" size="sm" onClick={() => nav(`/clientes/${c.id}`)}>
-                          Editar
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => deleteMutation.mutate(c.id)}
-                          disabled={deleteMutation.isPending}
-                        >
-                          Excluir
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {filtered.map((c: any) => {
+                  const expanded = expandedClienteId === c.id;
+                  const historico = expanded ? clienteHistoricoQuery.data ?? [] : [];
+
+                  return (
+                    <Fragment key={c.id}>
+                      <TableRow className={expanded ? "bg-muted/30" : undefined}>
+                        <TableCell className="font-medium">{c.nome}</TableCell>
+                        <TableCell>{c.telefone ?? "—"}</TableCell>
+                        <TableCell>{c.email ?? "—"}</TableCell>
+                        <TableCell>{formatDateOnly(c.data_nascimento)}</TableCell>
+                        <TableCell>{formatDateOnly(c.created_at)}</TableCell>
+                        <TableCell>{formatDateOnly(c.ultima_visita)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{c.atendimentos_count ?? 0}</TableCell>
+                        <TableCell className="text-right tabular-nums">{c.cancelamentos_count ?? 0}</TableCell>
+                        <TableCell className="max-w-[320px] truncate">
+                          {(c.atendimentos_servicos ?? []).length > 0 ? (c.atendimentos_servicos ?? []).join(", ") : "—"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <Button variant="outline" size="sm" onClick={() => toggleHistorico(c.id)}>
+                              {expanded ? <ChevronUp className="mr-1 h-4 w-4" /> : <ChevronDown className="mr-1 h-4 w-4" />}
+                              Histórico
+                            </Button>
+                            <Button variant="secondary" size="sm" onClick={() => nav(`/clientes/${c.id}`)}>
+                              Editar
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => deleteMutation.mutate(c.id)}
+                              disabled={deleteMutation.isPending}
+                            >
+                              Excluir
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+
+                      {expanded ? (
+                        <TableRow>
+                          <TableCell colSpan={10} className="bg-muted/10 p-0">
+                            <div className="border-t bg-background px-4 py-4 sm:px-6">
+                              <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                  <h4 className="text-sm font-semibold">Histórico do cliente</h4>
+                                  <p className="text-sm text-muted-foreground">
+                                    Atendimentos, cancelamentos e observações registradas ao longo do tempo.
+                                  </p>
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {clienteHistoricoQuery.isFetching ? "Atualizando histórico…" : `${historico.length} registro(s)`}
+                                </div>
+                              </div>
+
+                              {clienteHistoricoQuery.isLoading ? (
+                                <div className="py-4 text-sm text-muted-foreground">Carregando histórico…</div>
+                              ) : null}
+
+                              {clienteHistoricoQuery.error ? (
+                                <div className="py-4 text-sm text-destructive">Erro ao carregar o histórico deste cliente.</div>
+                              ) : null}
+
+                              {!clienteHistoricoQuery.isLoading && !clienteHistoricoQuery.error && historico.length === 0 ? (
+                                <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                                  Este cliente ainda não possui histórico de agendamentos.
+                                </div>
+                              ) : null}
+
+                              {!clienteHistoricoQuery.isLoading && !clienteHistoricoQuery.error && historico.length > 0 ? (
+                                <div className="space-y-4">
+                                  {historico.map((item: any, index: number) => {
+                                    const servicos = (item.itens ?? [])
+                                      .map((it: any) => String(it?.servico?.nome ?? "(Serviço)"))
+                                      .filter(Boolean);
+
+                                    return (
+                                      <div key={item.id}>
+                                        <div className="grid gap-3 rounded-lg border p-4 md:grid-cols-[1.2fr_1fr]">
+                                          <div className="space-y-2">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                              <Badge variant={statusVariant(item.status)}>{statusLabel(item.status)}</Badge>
+                                              <span className="text-sm font-medium">{formatDateTime(item.data_hora_inicio)}</span>
+                                            </div>
+
+                                            <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                                              <div>
+                                                <span className="font-medium text-foreground">Profissional:</span>{" "}
+                                                {item?.funcionario?.nome ?? "—"}
+                                              </div>
+                                              <div>
+                                                <span className="font-medium text-foreground">Valor:</span>{" "}
+                                                {formatMoney(item.total_valor)}
+                                              </div>
+                                            </div>
+
+                                            <div className="text-sm">
+                                              <span className="font-medium">Serviços:</span>{" "}
+                                              <span className="text-muted-foreground">{servicos.length > 0 ? servicos.join(", ") : "—"}</span>
+                                            </div>
+                                          </div>
+
+                                          <div className="rounded-md bg-muted/40 p-3 text-sm">
+                                            <div className="mb-1 font-medium">Observações</div>
+                                            <div className="whitespace-pre-wrap text-muted-foreground">
+                                              {item.observacoes?.trim() ? item.observacoes : "Nenhuma observação registrada neste atendimento."}
+                                            </div>
+                                          </div>
+                                        </div>
+                                        {index < historico.length - 1 ? <Separator className="my-4" /> : null}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ) : null}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
 
                 {filtered.length === 0 ? (
                   <TableRow>
