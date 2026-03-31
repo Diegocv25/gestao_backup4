@@ -5,11 +5,14 @@ type Props = {
   description?: string;
   actions?: ReactNode;
   children: ReactNode;
+  width?: "default" | "wide";
 };
 
-export function FormPageShell({ title, description, actions, children }: Props) {
+export function FormPageShell({ title, description, actions, children, width = "default" }: Props) {
+  const containerClass = width === "wide" ? "max-w-7xl" : "max-w-3xl";
+
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6">
+    <div className={`mx-auto w-full ${containerClass} space-y-6`}>
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>

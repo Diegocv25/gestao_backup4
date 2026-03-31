@@ -212,9 +212,15 @@ export default function ClientesPage() {
     <FormPageShell
       title="Clientes"
       description="Cadastro completo (Supabase)."
+      width="wide"
       actions={
         <>
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nome, telefone ou email…" />
+          <Input
+            className="w-full sm:w-[320px]"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar por nome, telefone ou email…"
+          />
           <Button onClick={() => nav("/clientes/novo")}>Novo cliente</Button>
         </>
       }
@@ -238,7 +244,7 @@ export default function ClientesPage() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Lista</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-x-auto">
           {!salaoId ? <div className="text-sm text-muted-foreground">Configure o salão para ver os clientes.</div> : null}
           {isLoading ? <div className="text-sm text-muted-foreground">Carregando…</div> : null}
           {error ? <div className="text-sm text-destructive">Erro ao carregar.</div> : null}
